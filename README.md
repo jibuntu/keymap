@@ -4,9 +4,9 @@ This is a tool to change key code on linux.
 # usage
 ```bash
 cargo build
-./target/debug/keymap file_path
+sudo ./target/debug/keymap file_path
 ```
-file_path must be an absolute oath.
+file_path must be an absolute path.
 
 # Example of keymap file
 * You can see all keys in keymap/src/rules/keycode/mod.rs.
