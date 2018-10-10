@@ -1,0 +1,12 @@
+leftAlt -> internal_1
+
+internal_1 + i -> up
+internal_1 + j -> left
+internal_1 + k -> down
+internal_1 + l -> right
+
+internal_1 + n -> home
+internal_1 + m -> end
+
+internal_1 + semicolon -> muhenkan
+internal_1 + apostrophe -> henkan
