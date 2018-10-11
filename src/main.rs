@@ -48,7 +48,8 @@ fn main() {
     loop {
         let (ty, read_code, state) = kbd.read_key();
 
-        //println!("\t{} {} {}", ty, read_code, state);
+        #[cfg(debug_assertions)]
+        println!("\t{} {} {}", ty, read_code, state);
 
         let code = rules.change_keycode(read_code).unwrap_or(read_code);
 
