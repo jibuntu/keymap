@@ -99,6 +99,7 @@ impl Rules {
             Ok(file) => file,
             Err(e) => { println!("Can't open: {:?}", e.kind()); return None; }
         };
+        let mut is_err = 0;
         let mut data = String::new();
         let mut modifier_rules: Vec<ModifierRule> = Vec::new();
         let mut keycode_rules: HashMap<u16, u16> = HashMap::new();
@@ -119,7 +120,8 @@ impl Rules {
                     }
                 }
             }else{
-                if i == 0 {
+                if is_err == 0 {
+                    is_err = 1;
                     println!("Below lines could not be convert.");
                 }
                 println!(" {:3} | {}", i, data_line);

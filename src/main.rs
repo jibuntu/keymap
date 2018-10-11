@@ -16,7 +16,15 @@ use rules::Rules;
 
 
 fn main() {
-    let wait_time = std::time::Duration::from_millis(500);
+    let wait_time = std::time::Duration::from_millis(250);
+    let path = match env::args().nth(1) {
+        Some(arg) => { arg },
+        None => { 
+            println!("There is no option.");
+            return;
+        }
+    };
+
     std::thread::sleep(wait_time);
     let kbd = match Keyboard::open_and_grab() {
         Ok(kbd) => kbd,
@@ -26,14 +34,6 @@ fn main() {
         Some(vkbd) => vkbd,
         None => {
             println!("Can't create virtual_keyboard.");
-            return;
-        }
-    };
-
-    let path = match env::args().nth(1) {
-        Some(arg) => { arg },
-        None => { 
-            println!("There is no option.");
             return;
         }
     };
