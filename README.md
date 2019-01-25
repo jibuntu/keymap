@@ -16,8 +16,10 @@ sudo ./target/debug/keymap file_path
 A -> B
 
 # Change leftAlt to leftCtrl
-leftAlt -> leftCtrl
+LeftAlt -> LeftCtrl
 
-# Up is inputed when left control key and "K" key are pushed.
-leftCtrl + K -> up
+LeftCtrl + I -> Up
+LeftCtrl + K -> Down
+LeftCtrl + E -> Esc
+Tab + S -> LeftCtrl + S
 ```
