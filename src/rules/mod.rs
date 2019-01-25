@@ -19,26 +19,23 @@ fn get_left_keywords(left_match: &str) -> Option<HashSet<String>> {
     Some(keywords)
 }
 
-fn get_right_keyword(right_match: &str) -> Option<String> {
-    lazy_static! { static ref re: Regex = Regex::new(r"[^ ]+").unwrap(); }
-    let mut keyword_iter = re.find_iter(right_match);
-    
-    let keyword = match keyword_iter.next() {
-        Some(keyword) => keyword.as_str().to_string(),
-        None => return None
-    };
+fn get_right_keywords(right_match: &str) -> Option<Vec<String>> {
+    lazy_static! { static ref re: Regex = Regex::new(r"[^ +]+").unwrap(); }
+    let keywords: Vec<String> =
+        re.find_iter(right_match)
+        .map(|keyword| keyword.as_str().to_string())
+        .collect();
 
-    // 必要以上にキーワードがあったらエラー
-    if let Some(_) = keyword_iter.next() {
+    if keywords.len() == 0 {
         return None;
     }
 
-    Some(keyword)
+    Some(keywords)
 }
 
 pub struct ModifierRule {
     pub keys: HashSet<u16>,
-    pub value: u16,
+    pub value: Vec<u16>,
 }
 
 enum ValueConvertedLine {
@@ -58,8 +55,9 @@ fn convert_line(rule_str: &str) -> Option<ValueConvertedLine> {
         Some(keywords) => {
             let mut left_keycodes: HashSet<u16> = HashSet::with_capacity(keywords.len());
             for keyword in &keywords {
-                // 同じキーがあるときはだめ
-                if left_keycodes.insert(keycode.from_keyword(keyword)?) == false {
+                // 同じキーがあるときはエラー
+                let code = keycode.from_keyword(keyword)?;
+                if left_keycodes.insert(code) == false {
                     return None
                 }
             }
@@ -68,18 +66,25 @@ fn convert_line(rule_str: &str) -> Option<ValueConvertedLine> {
         None => return None
     };
 
-    let right_keycode = match get_right_keyword(&capture[2]) {
-        Some(keyword) => keycode.from_keyword(&keyword)?,
+    let right_keycodes = match get_right_keywords(&capture[2]) {
+        Some(keywords) => {
+            let mut right_keycodes: Vec<u16> = Vec::new();
+            for keyword in &keywords {
+                let code = keycode.from_keyword(keyword)?;
+                right_keycodes.push(code);
+            }
+            right_keycodes
+        },
         None => return None
     };
 
-    if left_keycodes.len() == 1 {
-        return Some(ValueConvertedLine::Keycode((*left_keycodes.iter().nth(0).unwrap(), right_keycode)));
+    if left_keycodes.len() == 1 && right_keycodes.len() == 1 {
+        return Some(ValueConvertedLine::Keycode((*left_keycodes.iter().nth(0).unwrap(), right_keycodes[0])));
     }
 
     return Some(ValueConvertedLine::ModifierRule(ModifierRule {
         keys: left_keycodes,
-        value: right_keycode
+        value: right_keycodes
     }))
 }
 
@@ -149,6 +154,28 @@ impl Rules {
         }
         None
     }
+
+    // ルールを表示する
+    pub fn display(self) {
+        println!("Convert code:");
+        for (left, right) in &self.keycode_rules {
+            println!("    {} -> {}", *left, *right);
+        }
+
+        println!("Convert modifier:");
+        for modifier_rule in &self.modifier_rules {
+            print!("    ");
+            for key in &modifier_rule.keys {
+                print!("{} ", *key);
+            }
+            print!("-> ");
+            for value in &modifier_rule.value {
+                print!("{} ", *value);
+            }
+            print!("\n");
+        }
+    }
+
 }
 
 #[test]
@@ -157,4 +184,5 @@ fn test_rules() {
         Some(rules) => rules,
         None => return
     };
+    rules.display();
 }

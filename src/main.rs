@@ -63,14 +63,23 @@ fn main() {
                             vkbd.leave(*key); 
                         }
                     }
-                    vkbd.push(rule.value);
+
+                    for value in &rule.value {
+                        vkbd.push(*value);
+                    }
                 }else{
                     vkbd.push(code);
                 }
             },
             0 => {
                 if let Some(rule) = rules.contains_and_trigger(&pressed_keys, code) {
-                    vkbd.leave(rule.value);
+                    for value in &rule.value {
+                        if vkbd.contains(*value) == true {
+                            // 念の為、押されているキーのみを離す
+                            vkbd.leave(*value);
+                        }
+                    }
+
                 }else if vkbd.contains(code) { // 入力されていないキーは戻さない
                     vkbd.leave(code);
                 }
@@ -78,7 +87,7 @@ fn main() {
             },
             2 => {
                 if let Some(rule) = rules.contains_and_trigger(&pressed_keys, code) {
-                    vkbd.repeat(rule.value);
+                     vkbd.repeat(rule.value[0]); // 最初のキーのみリピートする
                 }else if vkbd.contains(code) {
                     vkbd.repeat(code);
                 }
