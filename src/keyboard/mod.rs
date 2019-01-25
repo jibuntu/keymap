@@ -90,7 +90,9 @@ fn read_keyboard(device: File, sender: mpsc::Sender<(u16, u16, i32)>) {
     let event_p = &mut event as *mut InputEvnet as *mut libc::c_void;
     loop{
         unsafe {
-            libc::read(device.as_raw_fd(), event_p, mem::size_of::<InputEvnet>());
+            if libc::read(device.as_raw_fd(), event_p, mem::size_of::<InputEvnet>()) == -1 {
+                return;
+            }
         }
         sender.send((event.ty, event.code, event.value));
     }
