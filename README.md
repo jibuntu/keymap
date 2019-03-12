@@ -1,9 +1,16 @@
-# keymap
-This is a tool to change key code on linux.
+# What is "keymap"?
+This program is a command line tool.
+
+# What can we do using this?
+You can change keyboard layout.
 
 # usage
+You must built this program before using.
 ```bash
 cargo build
+```
+<!-- ファイルを指定して実行する -->
+```
 sudo ./target/debug/keymap file_path
 ```
 
