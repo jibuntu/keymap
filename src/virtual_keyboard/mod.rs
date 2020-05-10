@@ -1,9 +1,10 @@
 #![allow(dead_code)]
 #![allow(non_snake_case)]
 #![allow(unused_must_use)]
+#![allow(unused_parens)]
 
 use std::os::raw::*;
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::collections::HashSet;
 
 extern "C" {

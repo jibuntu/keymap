@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 #![allow(non_snake_case)]
 #![allow(unused_must_use)]
+#![allow(unused_parens)]
 
 use std::fs::File;
 use std::io::prelude::*;
@@ -9,7 +10,6 @@ use std::os::unix::io::AsRawFd;
 use std::mem;
 use std::thread;
 use std::sync::mpsc;
-use std::option;
 use regex::Regex;
 use libc;
 use std::os::unix::io::RawFd;

@@ -69,8 +69,6 @@ int close_virtual_keyboard(int fd){
 }
 
 void example_main(void){
-  struct uinput_setup usetup;
-
   int fd = open_virtual_keyboard("Example keyboard");
   
   if(fd == -1){

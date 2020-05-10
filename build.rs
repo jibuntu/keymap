@@ -1,11 +1,12 @@
-extern crate gcc;
+// extern crate gcc;
+extern crate cc;
 
 fn main(){
-    gcc::Config::new()
+    cc::Build::new()
         .file("src/c/ioctl_eviocgrab.c")
         .include("src")
         .compile("libioctl_eviocgrab");
-    gcc::Config::new()
+    cc::Build::new()
         .file("src/c/virtual_keyboard.c")
         .include("src")
         .compile("virtual_keyboard");

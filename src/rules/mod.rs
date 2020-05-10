@@ -1,6 +1,6 @@
+#![allow(dead_code)]
 use std::io::Read;
 use std::fs::File;
-use std::io;
 use regex::Regex;
 use std::collections::{HashSet,HashMap};
 
@@ -9,8 +9,8 @@ use self::keycode::Keycode;
 
 
 fn get_left_keywords(left_match: &str) -> Option<HashSet<String>> {
-    lazy_static! { static ref re: Regex = Regex::new(r"[^ +]+").unwrap(); }
-    let keywords: HashSet<String> = re.find_iter(left_match).map(|keyword| keyword.as_str().to_string()).collect();
+    lazy_static! { static ref RE: Regex = Regex::new(r"[^ +]+").unwrap(); }
+    let keywords: HashSet<String> = RE.find_iter(left_match).map(|keyword| keyword.as_str().to_string()).collect();
 
     if keywords.len() == 0 {
         return None;
@@ -20,9 +20,9 @@ fn get_left_keywords(left_match: &str) -> Option<HashSet<String>> {
 }
 
 fn get_right_keywords(right_match: &str) -> Option<Vec<String>> {
-    lazy_static! { static ref re: Regex = Regex::new(r"[^ +]+").unwrap(); }
+    lazy_static! { static ref RE: Regex = Regex::new(r"[^ +]+").unwrap(); }
     let keywords: Vec<String> =
-        re.find_iter(right_match)
+        RE.find_iter(right_match)
         .map(|keyword| keyword.as_str().to_string())
         .collect();
 
@@ -45,8 +45,8 @@ enum ValueConvertedLine {
 
 fn convert_line(rule_str: &str) -> Option<ValueConvertedLine> {
     let keycode = Keycode::new();
-    lazy_static! { static ref re: Regex = Regex::new("(.*)->(.*)").unwrap(); }
-    let capture = match re.captures(rule_str) { 
+    lazy_static! { static ref RE: Regex = Regex::new("(.*)->(.*)").unwrap(); }
+    let capture = match RE.captures(rule_str) { 
         Some(capture) => capture,
         None => return None
     };
@@ -89,8 +89,8 @@ fn convert_line(rule_str: &str) -> Option<ValueConvertedLine> {
 }
 
 fn line_is_empty_or_comment(line_: &str) -> bool {
-    lazy_static! { static ref re: Regex = Regex::new("^ *$|^ *#").unwrap(); }
-    re.is_match(line_)
+    lazy_static! { static ref RE: Regex = Regex::new("^ *$|^ *#").unwrap(); }
+    RE.is_match(line_)
 }
 
 pub struct Rules {
@@ -108,7 +108,7 @@ impl Rules {
         let mut data = String::new();
         let mut modifier_rules: Vec<ModifierRule> = Vec::new();
         let mut keycode_rules: HashMap<u16, u16> = HashMap::new();
-        file.read_to_string(&mut data);
+        let _ = file.read_to_string(&mut data);
 
         for (i, data_line) in data.lines().enumerate() {
             if line_is_empty_or_comment(data_line) {

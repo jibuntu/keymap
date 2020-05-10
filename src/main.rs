@@ -2,7 +2,7 @@ extern crate libc;
 extern crate regex;
 #[macro_use]
 extern crate lazy_static;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::env;
 
 mod keyboard;
