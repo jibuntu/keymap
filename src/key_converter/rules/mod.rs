@@ -150,6 +150,12 @@ mod test {
         let KEY_SHIFT: u16 = code.from_keyword("LEFTSHIFT").unwrap();
         let KEY_ENTER: u16 = code.from_keyword("ENTER").unwrap();
         let KEY_ALT: u16 = code.from_keyword("LEFTALT").unwrap();
+        let KEY_BACKSPACE: u16 = code.from_keyword("BACKSPACE").unwrap();
+        let KEY_TAB: u16 = code.from_keyword("TAB").unwrap();
+        let KEY_LEFT: u16 = code.from_keyword("LEFT").unwrap();
+        let KEY_RIGHT: u16 = code.from_keyword("RIGHT").unwrap();
+        let KEY_UP: u16 = code.from_keyword("UP").unwrap();
+        let KEY_DOWN: u16 = code.from_keyword("DOWN").unwrap();
 
         let rule = Rules::new();
         assert_eq!(rule.filter(&hash![Key::Raw(KEY_A)]), hash![Key::Raw(KEY_A)]);
@@ -212,5 +218,27 @@ mod test {
         rule.list.push(KeyRule::new(vec![Key::Con(KEY_ENTER), Key::Con(KEY_SHIFT)], vec![Key::Con(KEY_A)]));
         // push B + C + ALT = 'A
         assert_eq!(rule.filter(&hash![Key::Raw(KEY_B), Key::Raw(KEY_C), Key::Raw(KEY_ALT)]), hash![Key::Con(KEY_A)]);
+
+        // 'ENTER + 'SHIFT + BACKSPACE + TAB -> 'LEFT + 'RIGHT + 'UP + 'DOWN
+        rule.list.push(
+            KeyRule::new(
+                vec![Key::Con(KEY_ENTER), Key::Con(KEY_SHIFT), Key::Raw(KEY_BACKSPACE), Key::Raw(KEY_TAB)], 
+                vec![Key::Con(KEY_LEFT), Key::Con(KEY_RIGHT), Key::Con(KEY_UP), Key::Con(KEY_DOWN)]
+            )
+        );
+        // push B + C + ALT + BACKSPACE + TAB = 'A + 'LEFT + 'RIGHT + 'UP + 'DOWN
+        // B + C + ALTを変換した後の'ENTER + 'SHIFTは'Aになり、
+        // その上で今回のルールのキーにもなっている
+        assert_eq!(rule.filter(&hash![Key::Raw(KEY_B), Key::Raw(KEY_C), Key::Raw(KEY_ALT), Key::Raw(KEY_BACKSPACE), Key::Raw(KEY_TAB)]), hash![Key::Con(KEY_A), Key::Con(KEY_LEFT), Key::Con(KEY_RIGHT), Key::Con(KEY_UP), Key::Con(KEY_DOWN)]);
+
+        // 'A + 'LEFT + 'RIGHT + 'UP + 'DOWN -> 'F
+        rule.list.push(
+            KeyRule::new(
+                vec![Key::Con(KEY_A), Key::Con(KEY_LEFT), Key::Con(KEY_RIGHT), Key::Con(KEY_UP), Key::Con(KEY_DOWN)],
+                vec![Key::Con(KEY_F)]
+            )
+        );
+        // push B + C + ALT + BACKSPACE + TAB = 'F
+        assert_eq!(rule.filter(&hash![Key::Raw(KEY_B), Key::Raw(KEY_C), Key::Raw(KEY_ALT), Key::Raw(KEY_BACKSPACE), Key::Raw(KEY_TAB)]), hash![Key::Con(KEY_F)]);
     }
 }
