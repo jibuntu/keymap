@@ -1,9 +1,16 @@
-# keymap
-This is a tool to change key code on linux.
+# What is "keymap"?
+This program is a command line tool.
+
+# What can we do using this?
+You can change keyboard layout.
 
 # usage
+You must built this program before using.
 ```bash
 cargo build
+```
+<!-- ファイルを指定して実行する -->
+```
 sudo ./target/debug/keymap file_path
 ```
 
@@ -16,8 +23,10 @@ sudo ./target/debug/keymap file_path
 A -> B
 
 # Change leftAlt to leftCtrl
-leftAlt -> leftCtrl
+LeftAlt -> LeftCtrl
 
-# Up is inputed when left control key and "K" key are pushed.
-leftCtrl + K -> up
+LeftCtrl + I -> Up
+LeftCtrl + K -> Down
+LeftCtrl + E -> Esc
+Tab + S -> LeftCtrl + S
 ```
