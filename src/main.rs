@@ -8,10 +8,12 @@ use std::env;
 mod keyboard;
 mod virtual_keyboard;
 mod rules;
+mod key_converter;
 
 use keyboard::Keyboard;
 use virtual_keyboard::*;
 use rules::Rules;
+use key_converter::KeyConverter;
 
 
 
