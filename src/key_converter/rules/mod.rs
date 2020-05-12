@@ -197,7 +197,20 @@ mod test {
         rule.list.push(KeyRule::new(vec![Key::Raw(KEY_ALT)], vec![Key::Con(KEY_CTRL)]));
         // 'I + 'CTRL -> 'ENTER
         rule.list.push(KeyRule::new(vec![Key::Con(KEY_I), Key::Con(KEY_CTRL)], vec![Key::Con(KEY_ENTER)]));
-        // push B + ALT
+        // C + 'J
+        rule.list.push(KeyRule::new(vec![Key::Raw(KEY_C)], vec![Key::Con(KEY_J)]));
+        // 'J + 'CTRL -> 'SHIFT
+        rule.list.push(KeyRule::new(vec![Key::Con(KEY_J), Key::Con(KEY_CTRL)], vec![Key::Con(KEY_SHIFT)]));
+        // push B + ALT = 'ENTER
         assert_eq!(rule.filter(&hash![Key::Raw(KEY_B), Key::Raw(KEY_ALT)]), hash![Key::Con(KEY_ENTER)]);
+        // push C + ALT = 'SHIFT
+        assert_eq!(rule.filter(&hash![Key::Raw(KEY_C), Key::Raw(KEY_ALT)]), hash![Key::Con(KEY_SHIFT)]);
+        // push B + C + ALT = 'ENTER + 'SHIFT
+        assert_eq!(rule.filter(&hash![Key::Raw(KEY_B), Key::Raw(KEY_C), Key::Raw(KEY_ALT)]), hash![Key::Con(KEY_ENTER), Key::Con(KEY_SHIFT)]);
+
+        // 'ENTER + 'SHIFT -> 'A
+        rule.list.push(KeyRule::new(vec![Key::Con(KEY_ENTER), Key::Con(KEY_SHIFT)], vec![Key::Con(KEY_A)]));
+        // push B + C + ALT = 'A
+        assert_eq!(rule.filter(&hash![Key::Raw(KEY_B), Key::Raw(KEY_C), Key::Raw(KEY_ALT)]), hash![Key::Con(KEY_A)]);
     }
 }
