@@ -7,7 +7,7 @@ use std::iter::FromIterator;
 use std::cmp::Eq;
 use std::hash::Hash;
 
-mod keycode;
+pub mod keycode;
 use self::keycode::Keycode;
 
 
