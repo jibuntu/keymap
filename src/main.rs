@@ -2,8 +2,6 @@ extern crate libc;
 extern crate regex;
 #[macro_use]
 extern crate lazy_static;
-use std::collections::HashSet;
-use std::env;
 
 mod keyboard;
 mod virtual_keyboard;
@@ -12,25 +10,25 @@ mod key_converter;
 
 use keyboard::Keyboard;
 use virtual_keyboard::*;
-use rules::Rules;
 use key_converter::KeyConverter;
 
 
 
 fn main() {
     let wait_time = std::time::Duration::from_millis(250);
-    let path = match env::args().nth(1) {
-        Some(arg) => { arg },
-        None => { 
-            println!("There is no option.");
-            return;
-        }
-    };
+    //let path = match env::args().nth(1) {
+    //    Some(arg) => { arg },
+    //    None => { 
+    //        println!("There is no option.");
+    //        return;
+    //    }
+    //};
 
     std::thread::sleep(wait_time);
+    
     let kbd = match Keyboard::open_and_grab() {
         Ok(kbd) => kbd,
-        Err(e) => { println!("{:?}", e.kind()); return; }
+        Err(e) => { println!("Error: {:?}", e.kind()); return; }
     };
     let mut vkbd = match VirtualKeyboard::new() {
         Some(vkbd) => vkbd,
@@ -39,12 +37,81 @@ fn main() {
             return;
         }
     };
-    let rules = match Rules::from_file(&path) { 
-        Some(rules) => rules,
-        None => return
-    };
 
+    let mut kc = KeyConverter::new();
 
+    //loop {
+    for _ in 0..50 {
+        let (_, read_code, state) = kbd.read_key();
+        
+        // 結果をoptionで受け取る
+        let (push, leave) = match state {
+            // push
+            1 => {
+                let (push, leave) = kc.push(read_code);
+
+                for l in &leave {
+                    vkbd.leave(*l);
+                }
+
+                for p in &push {
+                    vkbd.push(*p);
+                }
+
+                (Some(push), Some(leave))
+            },
+            // leave
+            0 => {
+                let leave = kc.leave(read_code);
+
+                for l in &leave {
+                    vkbd.leave(*l);
+                }
+
+                (None, Some(leave))
+            },
+            // repeat
+            2 => {
+                (None, None)
+            },
+            _ => panic!()
+        };
+
+        // 本来、statusの値はコマンドのオプションで決めるようにする
+        let show_state = false;
+        #[cfg(debug_assertions)]
+        let show_state = true;
+
+        // キーの状態を表示する
+        if show_state {
+            // 現実世界のキーボードで入力された値を表示
+            print!("\t kbd | ");
+            match state {
+                0 => print!("leave "),
+                1 => print!("push "),
+                2 => print!("repeat "),
+                _ => ()
+            }
+            println!("{}", read_code);
+
+            // 仮想的なキーボードで入力された値を表示
+            print!("\tvkbd | ");
+            for p in push.unwrap_or(Vec::new()) {
+                print!("push {} ", p);
+            }
+            for l in leave.unwrap_or(Vec::new()) {
+                print!("leave {} ", l);
+            }
+            println!();
+
+            // 押されているキーをルールに適用した結果を表示
+            println!("\trule | {}", kc.filter_to_string());
+            println!()
+        }
+    }
+}
+
+    /*
     let mut pressed_keys: HashSet<u16> = HashSet::new();
 
     loop {
@@ -96,5 +163,4 @@ fn main() {
             },
             _ => {}
         }
-    }
-}
+    */
