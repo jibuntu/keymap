@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate lazy_static;
 extern crate criterion;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::collections::HashSet;
@@ -51,5 +53,34 @@ pub fn rules_benchmark(c: &mut Criterion) {
     c.bench_function("Rule::filter 3", |b| b.iter(|| rules.filter(&k)));
 }
 
-criterion_group!(benches, rules_benchmark);
+// key_converterモジュールのベンチマークテストをする
+#[path = "../src/key_converter/mod.rs"]
+mod key_converter;
+use key_converter::KeyConverter;
+pub fn key_converter_benchmark(c: &mut Criterion) {
+    let mut kc = KeyConverter::new();
+    let code = Keycode::new();
+    let key_a = code.from_keyword("A").unwrap();
+    let key_n = code.from_keyword("N").unwrap();
+    let key_h = code.from_keyword("H").unwrap();
+    let key_ctrl = code.from_keyword("LEFTCTRL").unwrap();
+    
+    // A -> 'Bの変換が行われる
+    c.bench_function("KeyConverter 1", |b| b.iter(|| {
+        kc.push(key_a);
+        kc.leave(key_a);
+    }));
+
+    // N -> 'L, H -> 'I, LEFTCTRL + 'L -> 'LEFT, LEFTCTRL + 'I -> 'RIGHT
+    c.bench_function("KeyConverter 2", |b| b.iter(|| {
+        kc.push(key_n);
+        kc.push(key_h);
+        kc.push(key_ctrl);
+        kc.leave(key_ctrl);
+        kc.leave(key_h);
+        kc.leave(key_n);
+    }));
+}
+
+criterion_group!(benches, rules_benchmark, key_converter_benchmark);
 criterion_main!(benches);

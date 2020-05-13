@@ -12,6 +12,7 @@ lazy_static = "1.1.0"
 cc = "1.0"
 
 [dev-dependencies]
+lazy_static = "1.1.0"
 criterion = "0.3"
 
 [[bench]]
