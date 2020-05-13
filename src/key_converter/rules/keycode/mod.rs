@@ -557,6 +557,17 @@ impl Keycode {
         }
         None
     }
+
+    /// キーコードの値から文字列を返す。
+    /// キーコードを元にステータスを表示するときに使う
+    pub fn from_keycode(&self, keycode: u16) -> Option<String> {
+        for (k, v) in &self.keycode_map {
+            if *v == keycode {
+                return Some(k.clone())
+            }
+        }
+        None
+    }
 }
 
 

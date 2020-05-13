@@ -11,6 +11,12 @@ pub mod keycode;
 use self::keycode::Keycode;
 
 
+
+lazy_static! {
+    // 毎回作成するのは非効率なのでstaticにしておく
+    static ref KEYCODE: Keycode = Keycode::new();
+}
+
 /// 変換される前の元々のキーと、変換された後のキーを区別する
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Key {
@@ -24,6 +30,21 @@ impl Key {
             Key::Raw(n) => *n,
             Key::Con(n) => *n
         }
+    }
+
+    /// Keycodeモジュールを使いキーコードを文字列に変換する
+    pub fn to_string(&self) -> String {
+        let s = match self {
+            Key::Raw(n) => {
+                KEYCODE.from_keycode(*n).unwrap_or("UNKNOWN".to_string())
+            },
+            Key::Con(n) => {
+                "'".to_string() + &KEYCODE.from_keycode(*n)
+                                          .unwrap_or("UNKNOWN".to_string())
+            }
+        };
+
+        s
     }
 }
 
@@ -40,6 +61,29 @@ impl KeyRule {
             k: HashSet::from_iter(k.into_iter()),
             v: HashSet::from_iter(v.into_iter())
         }
+    }
+
+    /// ルールを文字列へ変換する
+    pub fn to_string(&self) -> String {
+        let mut s = String::new();
+
+        for (i, k) in self.k.iter().enumerate() {
+            s += &k.to_string();
+            if i != self.k.len()-1 {
+                s += " + ";
+            } else {
+                s += " -> ";
+            }
+        }
+
+        for (i, v) in self.v.iter().enumerate() {
+            s += &v.to_string();
+            if i != self.v.len()-1 {
+                s += " + ";
+            }
+        }
+
+        s
     }
 }
 
@@ -107,6 +151,42 @@ impl Rules {
         }
 
         vkeys
+    }
+
+    // ルールを元に引数のKeysをvkeysに変換し、それを文字列にする
+    pub fn filter_to_string(&self, keys: &HashSet<Key>) -> String {
+        // 最初はfilter関数と同じ処理
+        let mut matched_rules = Vec::new();
+        let mut vkeys = keys.clone();
+        
+        self.filter_recursion(&mut vkeys, &mut matched_rules);
+        
+        for k in matched_rules.iter().map(|r| &r.k).flatten() {
+            vkeys.remove(k);
+        }
+
+        // ここから文字列へ変換してゆく
+        let mut s = String::new();
+
+        //s += &matched_rules.iter().map(|r| r.to_string()).collect::<String>();
+
+        for (i, r) in matched_rules.iter().enumerate() {
+            s += &r.to_string();
+            if i != matched_rules.len()-1 {
+                s += " , ";
+            } else {
+                s += "  :  ";
+            }
+        }
+
+        for (i, v) in vkeys.iter().enumerate() {
+            s += &v.to_string();
+            if i != vkeys.len()-1 {
+                s += " + ";
+            }
+        }
+        
+        s
     }
 }
 
