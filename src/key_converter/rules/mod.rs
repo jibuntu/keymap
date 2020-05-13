@@ -99,6 +99,39 @@ impl Rules {
         }
     }
 
+    // 一時的に使うテスト用の関数
+    // 本当はRules構造体はファイルから作成する
+    pub fn test_new() -> Rules {
+        Rules {
+            list: vec![
+                KeyRule::new(
+                    vec![Key::Raw(KEYCODE.from_keyword("A").unwrap())], 
+                    vec![Key::Con(KEYCODE.from_keyword("B").unwrap())]
+                ),
+                KeyRule::new(
+                    vec![Key::Raw(KEYCODE.from_keyword("N").unwrap())], 
+                    vec![Key::Con(KEYCODE.from_keyword("L").unwrap())]
+                ),
+                KeyRule::new(
+                    vec![Key::Raw(KEYCODE.from_keyword("H").unwrap())], 
+                    vec![Key::Con(KEYCODE.from_keyword("I").unwrap())]
+                ),
+                KeyRule::new(
+                    vec![Key::Raw(KEYCODE.from_keyword("LEFTCTRL").unwrap()), Key::Con(KEYCODE.from_keyword("L").unwrap())], 
+                    vec![Key::Con(KEYCODE.from_keyword("LEFT").unwrap())]
+                ),
+                KeyRule::new(
+                    vec![Key::Raw(KEYCODE.from_keyword("LEFTCTRL").unwrap()), Key::Con(KEYCODE.from_keyword("I").unwrap())], 
+                    vec![Key::Con(KEYCODE.from_keyword("RIGHT").unwrap())]
+                ),
+                KeyRule::new(
+                    vec![Key::Raw(KEYCODE.from_keyword("U").unwrap()), Key::Raw(KEYCODE.from_keyword("X").unwrap())], 
+                    vec![Key::Con(KEYCODE.from_keyword("Y").unwrap()), Key::Con(KEYCODE.from_keyword("Z").unwrap())]
+                )
+            ]
+        }
+    }
+
     pub fn from_vec(v: Vec<KeyRule>) -> Rules {
         Rules {
             list: v
