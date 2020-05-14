@@ -7,7 +7,6 @@ use std::fs::File;
 
 mod keyboard;
 mod virtual_keyboard;
-mod rules;
 mod key_converter;
 
 use keyboard::Keyboard;
