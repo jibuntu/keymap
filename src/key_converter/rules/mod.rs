@@ -6,6 +6,7 @@ use std::collections::HashSet;
 use std::iter::FromIterator;
 use std::cmp::Eq;
 use std::hash::Hash;
+use std::io::Read;
 
 pub mod keycode;
 use self::keycode::Keycode;
@@ -25,6 +26,24 @@ pub enum Key {
 }
 
 impl Key {
+    /// 文字列からKeyを作成する
+    pub fn from_str(s: &str) -> Option<Key> {
+        if s.chars().next() == Some('\'') {
+            match s.get(1..) {
+                Some(s) => match KEYCODE.from_keyword(s) {
+                    Some(k) => return Some(Key::Con(k)),
+                    None => return None
+                },
+                None => return None
+            }
+        } else {
+            match KEYCODE.from_keyword(s) {
+                Some(k) => return Some(Key::Raw(k)),
+                None => return None
+            }
+        }
+    }
+
     pub fn to_u16(&self) -> u16 {
         match self {
             Key::Raw(n) => *n,
@@ -48,6 +67,36 @@ impl Key {
     }
 }
 
+#[cfg(test)]
+mod test_key {
+    use super::Keycode;
+    use super::Key;
+
+    #[test]
+    fn test_key_from_str() {
+        let keycode = Keycode::new();
+
+        let mut s = "";
+        assert_eq!(Key::from_str(& mut s), None);
+
+        let mut s = "  ";
+        assert_eq!(Key::from_str(& mut s), None);
+
+        let mut s = "A";
+        assert_eq!(Key::from_str(& mut s), Some(Key::Raw(keycode.from_keyword("A").unwrap())));
+
+        let mut s = "'B";
+        assert_eq!(Key::from_str(& mut s), Some(Key::Con(keycode.from_keyword("B").unwrap())));
+
+        let mut s = "RIGHTALT";
+        assert_eq!(Key::from_str(& mut s), Some(Key::Raw(keycode.from_keyword("RIGHTALT").unwrap())));
+
+        let mut s = "'RIGHTSHIFT";
+        assert_eq!(Key::from_str(& mut s), Some(Key::Con(keycode.from_keyword("RIGHTSHIFT").unwrap())));
+    }
+}
+
+
 /// KeyRule
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KeyRule {
@@ -61,6 +110,49 @@ impl KeyRule {
             k: HashSet::from_iter(k.into_iter()),
             v: HashSet::from_iter(v.into_iter())
         }
+    }
+
+    // 文字列からKeyRuleを作成する
+    pub fn from_str(s: &str) -> Option<KeyRule> {
+        let mut klist = HashSet::new();
+        let mut vlist = HashSet::new();
+
+        let mut s = s.split("->");
+        let kstr = match s.next() {
+            Some(kstr) => kstr,
+            None => return None
+        };
+        let vstr = match s.next() {
+            Some(vstr) => vstr,
+            None => return None
+        };
+
+        for k in kstr.split("+").map(|k| k.trim()) {
+            match Key::from_str(k) {
+                Some(k) => {
+                    klist.insert(k);
+                },
+                None => return None
+            }
+        }
+
+        for v in vstr.split("+").map(|v| v.trim()) {
+            match Key::from_str(v) {
+                Some(v) => {
+                    vlist.insert(v);
+                },
+                None => return None
+            }
+        }
+
+        if klist.len() == 0 || vlist.len() == 0 {
+            return None
+        }
+
+        Some(KeyRule {
+            k: klist,
+            v: vlist
+        })
     }
 
     /// ルールを文字列へ変換する
@@ -88,15 +180,35 @@ impl KeyRule {
 }
 
 /// ルールの構造体
+#[derive(Debug)]
 pub struct Rules {
     list: Vec<KeyRule>,
 }
 
 impl Rules {
-    pub fn new() -> Rules {
-        Rules {
-            list: Vec::new(),
+    /// ストリームからRulesを作る
+    pub fn new<R: Read>(mut r: R) -> Option<Rules> {
+        let mut s = String::new();
+        let mut list = Vec::new();
+
+        let _ = r.read_to_string(&mut s);
+
+        // コメントを削除して、不要な行を削除する
+        let lines = s.lines()
+            .map(|l| l.split('#').next().unwrap())
+            .map(|l| l.trim())
+            .filter(|l| l.len() != 0);
+
+        for l in lines {
+            match KeyRule::from_str(l) {
+                Some(k) => list.push(k),
+                None => return None
+            }
         }
+
+        Some(Rules {
+            list
+        })
     }
 
     // 一時的に使うテスト用の関数
@@ -243,6 +355,36 @@ mod test {
     }
 
     #[test]
+    fn test_rule_new() {
+        let code = Keycode::new();
+
+        let r = Rules::new("".as_bytes()).unwrap();
+        assert_eq!(r.list, vec![]);
+
+        if let Some(_) = Rules::new("->".as_bytes()) { panic!() }
+        if let Some(_) = Rules::new("a->".as_bytes()) { panic!() } 
+        if let Some(_) = Rules::new("->mm".as_bytes()) { panic!() } 
+
+        let r = Rules::new("A -> B".as_bytes()).unwrap();
+        assert_eq!(r.list, vec![
+            KeyRule::new(vec![Key::Raw(code.from_keyword("A").unwrap())], vec![Key::Raw(code.from_keyword("B").unwrap())])
+        ]);
+
+        let r = Rules::new(r#"
+        # test
+        A -> 'B
+        B -> 'A # test
+        # aiueo
+        C -> 'ENTER
+        "#.as_bytes()).unwrap();
+        assert_eq!(r.list, vec![
+            KeyRule::new(vec![Key::Raw(code.from_keyword("A").unwrap())], vec![Key::Con(code.from_keyword("B").unwrap())]),
+            KeyRule::new(vec![Key::Raw(code.from_keyword("B").unwrap())], vec![Key::Con(code.from_keyword("A").unwrap())]),
+            KeyRule::new(vec![Key::Raw(code.from_keyword("C").unwrap())], vec![Key::Con(code.from_keyword("ENTER").unwrap())]),
+        ]);
+    }
+
+    #[test]
     fn test_rule_filter() {
         #![allow(non_snake_case)]
         #![allow(unused_variables)]
@@ -270,15 +412,15 @@ mod test {
         let KEY_UP: u16 = code.from_keyword("UP").unwrap();
         let KEY_DOWN: u16 = code.from_keyword("DOWN").unwrap();
 
-        let rule = Rules::new();
+        let rule = Rules::new("".as_bytes()).unwrap();
         assert_eq!(rule.filter(&hash![Key::Raw(KEY_A)]), hash![Key::Raw(KEY_A)]);
 
-        let mut rule = Rules::new();
+        let mut rule = Rules::new("".as_bytes()).unwrap();
         // A -> 'H
         rule.list.push(KeyRule::new(vec![Key::Raw(KEY_A)], vec![Key::Con(KEY_H)]));
         assert_eq!(rule.filter(&hash![Key::Raw(KEY_A)]), hash![Key::Con(KEY_H)]);
 
-        let mut rule = Rules::new();
+        let mut rule = Rules::new("".as_bytes()).unwrap();
         // A -> 'H
         rule.list.push(KeyRule::new(vec![Key::Raw(KEY_A)], vec![Key::Con(KEY_H)]));
         // 'H -> 'A
@@ -286,7 +428,7 @@ mod test {
         assert_eq!(rule.filter(&hash![Key::Raw(KEY_A)]), hash![Key::Con(KEY_A)]);
 
 
-        let mut rule = Rules::new();
+        let mut rule = Rules::new("".as_bytes()).unwrap();
         // B -> 'I 
         rule.list.push(KeyRule::new(vec![Key::Raw(KEY_B)], vec![Key::Con(KEY_I)]));
         // I -> 'B 
@@ -309,7 +451,7 @@ mod test {
         // push I + A + B
         assert_eq!(rule.filter(&hash![Key::Raw(KEY_I), Key::Raw(KEY_A), Key::Raw(KEY_B)]), hash![Key::Con(KEY_ENTER), Key::Con(KEY_I)]);
 
-        let mut rule = Rules::new();
+        let mut rule = Rules::new("".as_bytes()).unwrap();
         // B -> 'I 
         rule.list.push(KeyRule::new(vec![Key::Raw(KEY_B)], vec![Key::Con(KEY_I)]));
         // ALT -> 'CTRL 
