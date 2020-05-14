@@ -10,7 +10,7 @@ F -> 'A
 J -> 'B
 
 
-# You can multiple keys when changing.
+# You can use multiple keys when changing.
 
 'LeftCtrl + 'A -> 'BackSpace
 
