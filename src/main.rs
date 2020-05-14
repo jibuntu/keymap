@@ -39,6 +39,8 @@ fn main() {
     };
 
     let mut kc = KeyConverter::new();
+    // 最後にpushしたキーコードを入れておく
+    let mut last_push = 0;
 
     //loop {
     for _ in 0..50 {
@@ -49,6 +51,7 @@ fn main() {
             // push
             1 => {
                 let (push, leave) = kc.push(read_code);
+                last_push = *push.last().unwrap();
 
                 for l in &leave {
                     vkbd.leave(*l);
@@ -72,6 +75,9 @@ fn main() {
             },
             // repeat
             2 => {
+                // 最後にvkbdにpushされたキーコードをrepeatする
+                vkbd.repeat(last_push);
+
                 (None, None)
             },
             _ => panic!()
