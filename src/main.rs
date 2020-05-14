@@ -210,12 +210,12 @@ fn main() {
         // grabしない
         kbd = match Keyboard::open() {
             Ok(kbd) => kbd,
-            Err(e) => { print_error(format!("Error: {:?}", e.kind())); return; }
+            Err(e) => { print_error(format!("{:?}", e.kind())); return; }
         };
     } else {
         kbd = match Keyboard::open_and_grab() {
             Ok(kbd) => kbd,
-            Err(e) => { print_error(format!("Error: {:?}", e.kind())); return; }
+            Err(e) => { print_error(format!("{:?}", e.kind())); return; }
         };
     }
 
