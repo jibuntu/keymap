@@ -1,0 +1,15 @@
+# you can change keyboard layout.
+
+CapsLock -> 'LeftCtrl
+LeftCtrl -> 'CapsLock
+
+F -> 'A
+J -> 'B
+
+
+# You can multiple keys when changing.
+
+'LeftCtrl + 'A -> 'BackSpace
+
+'LeftCtrl + 'B -> 'LeftCtrl + 'SHIFT + 'T
+

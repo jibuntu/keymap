@@ -1,32 +1,22 @@
-# What is "keymap"?
-This program is a command line tool.
-
-# What can we do using this?
-You can change keyboard layout.
-
-# usage
-You must built this program before using.
+# Example
 ```bash
-cargo build
-```
-<!-- ファイルを指定して実行する -->
-```
-sudo ./target/debug/keymap file_path
-```
+$ cat test/keymap.txt 
+# you can change keyboard layout.
 
-# Example of keymap file
-* You can see all keys in keymap/src/rules/keycode/mod.rs.
+CapsLock -> 'LeftCtrl
+LeftCtrl -> 'CapsLock
+
+F -> 'A
+J -> 'B
+
+
+# You can multiple keys when changing.
+
+'LeftCtrl + 'A -> 'BackSpace
+
+'LeftCtrl + 'B -> 'LeftCtrl + 'SHIFT + 'T
+
+$ cargo build --release
+$ sudo target/release/keymap test/keymap.txt
 ```
-# This line is comment.
-
-# Change "A" key to "B" key
-A -> B
-
-# Change leftAlt to leftCtrl
-LeftAlt -> LeftCtrl
-
-LeftCtrl + I -> Up
-LeftCtrl + K -> Down
-LeftCtrl + E -> Esc
-Tab + S -> LeftCtrl + S
-```
+You can see all keys in [keymap/src/key_converter/rules/keycode/mode.rs](https://github.com/jibuntu/keymap/blob/master/src/key_converter/rules/keycode/mod.rs)
