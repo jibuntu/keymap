@@ -2,6 +2,7 @@
 /// キーを変換するためのモジュール
 
 use std::collections::HashSet;
+use std::io::Read;
 
 mod rules;
 use self::rules::Rules;
@@ -15,12 +16,17 @@ pub struct KeyConverter {
 }
 
 impl KeyConverter {
-    pub fn new() -> KeyConverter {
-        KeyConverter {
+    pub fn new<R: Read>(r: R) -> Option<KeyConverter> {
+        let rules = match Rules::new(r) {
+            Some(rules) => rules,
+            None => return None
+        };
+
+        Some(KeyConverter {
             keys: HashSet::new(),
             vkeys: HashSet::new(),
-            rules: Rules::test_new(),
-        }
+            rules
+        })
     }
     
     /// 前回とのvkeysの差分を元に返り値を返す。
