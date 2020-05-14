@@ -108,6 +108,9 @@ fn main() {
             for l in leave.unwrap_or(Vec::new()) {
                 print!("leave {} ", l);
             }
+            if state == 2 {
+                print!("repeat {} ", last_push);
+            }
             println!();
 
             // 押されているキーをルールに適用した結果を表示
