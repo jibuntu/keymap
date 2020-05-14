@@ -134,6 +134,23 @@ fn loop_keymap_without_vkbd(kbd: Keyboard, mut kc: KeyConverter) {
     }
 }
 
+fn print_help() {
+    println!("usage:");
+    println!("    keymap [options...] <rule>");
+    println!();
+    println!("arguments:");
+    println!("    <rule>    ルールを記述したファイルを指定します");
+    println!();
+    println!("options:");
+    println!("    -s, --show-stats    実行中にキーの状態を出力します");
+    println!("    -r, --rule          ルールを適用しますが、実際に変換後のキーが入力されることはありません");
+}
+
+fn print_error<T: std::fmt::Display>(t: T) {
+    println!("Error: {}", t);
+    print_help();
+}
+
 fn main() {
     let wait_time = std::time::Duration::from_millis(250);
     let mut show_state = false;
@@ -142,22 +159,48 @@ fn main() {
 
     // 引数をパースする
     for arg in env::args().skip(1) {
-        match arg.as_str() {
-            "-s" | "--show-stats" => show_state = true,
-            "-r" | "--rule" => only_rule = true,
-            s => filename = Some(s.to_string()),
+        if arg.len() == 0 {
+            continue
         }
+        
+        if arg.get(..2) == Some("--") {
+            match arg.get(2..) {
+                Some("show-state") => show_state = true,
+                Some("rule") => only_rule = true,
+                _ => {
+                    return print_error(
+                        format!("'{}'は無効なオプションです", arg))
+                }
+            }
+            continue
+        }
+
+        if arg.chars().next() == Some('-') {
+            for c in arg.chars().skip(1) {
+                match c {
+                    's' => show_state = true,
+                    'r' => only_rule = true,
+                    _ => {
+                        return print_error(
+                            format!("'{}'は無効なオプションです", arg))
+                    }
+                }
+            }
+            continue
+        }
+
+        filename = Some(arg);
     }
 
     let kc = match filename {
         Some(f) => match File::open(f) {
             Ok(f) => match KeyConverter::new(f) {
                 Some(kc) => kc,
-                None => return println!("Error: ルールが間違っています。")
+                None => return print_error("ルールが間違っています")
             },
-            Err(_) => return println!("Error: ファイルが開けません")
+            Err(_) => return print_error("ファイルが開けません")
         },
-        None => return println!("Error: ファイル名がありません")
+        None => return print_error("ファイル名がありません")
     };
 
     std::thread::sleep(wait_time);
@@ -167,19 +210,19 @@ fn main() {
         // grabしない
         kbd = match Keyboard::open() {
             Ok(kbd) => kbd,
-            Err(e) => { println!("Error: {:?}", e.kind()); return; }
+            Err(e) => { print_error(format!("Error: {:?}", e.kind())); return; }
         };
     } else {
         kbd = match Keyboard::open_and_grab() {
             Ok(kbd) => kbd,
-            Err(e) => { println!("Error: {:?}", e.kind()); return; }
+            Err(e) => { print_error(format!("Error: {:?}", e.kind())); return; }
         };
     }
 
     let vkbd = match VirtualKeyboard::new() {
         Some(vkbd) => vkbd,
         None => {
-            println!("Can't create virtual_keyboard.");
+            print_error("Can't create virtual_keyboard.");
             return;
         }
     };
