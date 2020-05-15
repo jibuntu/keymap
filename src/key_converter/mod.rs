@@ -16,13 +16,13 @@ pub struct KeyConverter {
 }
 
 impl KeyConverter {
-    pub fn new<R: Read>(r: R) -> Option<KeyConverter> {
+    pub fn new<R: Read>(r: R) -> Result<KeyConverter, String> {
         let rules = match Rules::new(r) {
-            Some(rules) => rules,
-            None => return None
+            Ok(rules) => rules,
+            Err(e) => return Err(e)
         };
 
-        Some(KeyConverter {
+        Ok(KeyConverter {
             keys: HashSet::new(),
             vkeys: HashSet::new(),
             rules

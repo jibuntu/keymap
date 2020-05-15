@@ -147,7 +147,6 @@ fn print_help() {
 
 fn print_error<T: std::fmt::Display>(t: T) {
     println!("Error: {}", t);
-    print_help();
 }
 
 fn main() {
@@ -167,8 +166,9 @@ fn main() {
                 Some("show-state") => show_state = true,
                 Some("rule") => only_rule = true,
                 _ => {
-                    return print_error(
-                        format!("'{}'は無効なオプションです", arg))
+                    print_error(format!("'{}'は無効なオプションです", arg));
+                    print_help();
+                    return 
                 }
             }
             continue
@@ -180,8 +180,9 @@ fn main() {
                     's' => show_state = true,
                     'r' => only_rule = true,
                     _ => {
-                        return print_error(
-                            format!("'{}'は無効なオプションです", arg))
+                        print_error(format!("'{}'は無効なオプションです", arg));
+                        print_help();
+                        return 
                     }
                 }
             }
@@ -194,12 +195,16 @@ fn main() {
     let kc = match filename {
         Some(f) => match File::open(f) {
             Ok(f) => match KeyConverter::new(f) {
-                Some(kc) => kc,
-                None => return print_error("ルールが間違っています")
+                Ok(kc) => kc,
+                Err(e) => return print_error(e)
             },
             Err(_) => return print_error("ファイルが開けません")
         },
-        None => return print_error("ファイル名がありません")
+        None => {
+            print_error("ファイル名がありません");
+            print_help();
+            return 
+        }
     };
 
     std::thread::sleep(wait_time);

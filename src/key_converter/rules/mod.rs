@@ -27,19 +27,21 @@ pub enum Key {
 
 impl Key {
     /// 文字列からKeyを作成する
-    pub fn from_str(s: &str) -> Option<Key> {
+    pub fn from_str(s: &str) -> Result<Key, String> {
         if s.chars().next() == Some('\'') {
             match s.get(1..) {
                 Some(s) => match KEYCODE.from_keyword(s) {
-                    Some(k) => return Some(Key::Con(k)),
-                    None => return None
+                    Some(k) => return Ok(Key::Con(k)),
+                    None => {
+                        return Err(format!("'{}'は無効なキーコードです", s))
+                    }
                 },
-                None => return None
+                None => return Err(format!("'{}'は無効なキーコードです", s))
             }
         } else {
             match KEYCODE.from_keyword(s) {
-                Some(k) => return Some(Key::Raw(k)),
-                None => return None
+                Some(k) => return Ok(Key::Raw(k)),
+                None => return Err(format!("'{}'は無効なキーコードです", s))
             }
         }
     }
@@ -77,22 +79,22 @@ mod test_key {
         let keycode = Keycode::new();
 
         let mut s = "";
-        assert_eq!(Key::from_str(& mut s), None);
+        assert_eq!(Key::from_str(& mut s), Err(format!("'{}'は無効なキーコードです", "")));
 
         let mut s = "  ";
-        assert_eq!(Key::from_str(& mut s), None);
+        assert_eq!(Key::from_str(& mut s), Err(format!("'{}'は無効なキーコードです", "  ")));
 
         let mut s = "A";
-        assert_eq!(Key::from_str(& mut s), Some(Key::Raw(keycode.from_keyword("A").unwrap())));
+        assert_eq!(Key::from_str(& mut s), Ok(Key::Raw(keycode.from_keyword("A").unwrap())));
 
         let mut s = "'B";
-        assert_eq!(Key::from_str(& mut s), Some(Key::Con(keycode.from_keyword("B").unwrap())));
+        assert_eq!(Key::from_str(& mut s), Ok(Key::Con(keycode.from_keyword("B").unwrap())));
 
         let mut s = "RIGHTALT";
-        assert_eq!(Key::from_str(& mut s), Some(Key::Raw(keycode.from_keyword("RIGHTALT").unwrap())));
+        assert_eq!(Key::from_str(& mut s), Ok(Key::Raw(keycode.from_keyword("RIGHTALT").unwrap())));
 
         let mut s = "'RIGHTSHIFT";
-        assert_eq!(Key::from_str(& mut s), Some(Key::Con(keycode.from_keyword("RIGHTSHIFT").unwrap())));
+        assert_eq!(Key::from_str(& mut s), Ok(Key::Con(keycode.from_keyword("RIGHTSHIFT").unwrap())));
     }
 }
 
@@ -113,43 +115,43 @@ impl KeyRule {
     }
 
     // 文字列からKeyRuleを作成する
-    pub fn from_str(s: &str) -> Option<KeyRule> {
+    pub fn from_str(s: &str) -> Result<KeyRule, String> {
         let mut klist = HashSet::new();
         let mut vlist = HashSet::new();
 
         let mut s = s.split("->");
         let kstr = match s.next() {
             Some(kstr) => kstr,
-            None => return None
+            None => return Err(format!("左側の値がありません"))
         };
         let vstr = match s.next() {
             Some(vstr) => vstr,
-            None => return None
+            None => return Err(format!("右側の値がありません"))
         };
 
         for k in kstr.split("+").map(|k| k.trim()) {
             match Key::from_str(k) {
-                Some(k) => {
+                Ok(k) => {
                     klist.insert(k);
                 },
-                None => return None
+                Err(e) => return Err(e)
             }
         }
 
         for v in vstr.split("+").map(|v| v.trim()) {
             match Key::from_str(v) {
-                Some(v) => {
+                Ok(v) => {
                     vlist.insert(v);
                 },
-                None => return None
+                Err(e) => return Err(e)
             }
         }
 
         if klist.len() == 0 || vlist.len() == 0 {
-            return None
+            return Err(format!("左側または右側の値がありません"))
         }
 
-        Some(KeyRule {
+        Ok(KeyRule {
             k: klist,
             v: vlist
         })
@@ -187,7 +189,7 @@ pub struct Rules {
 
 impl Rules {
     /// ストリームからRulesを作る
-    pub fn new<R: Read>(mut r: R) -> Option<Rules> {
+    pub fn new<R: Read>(mut r: R) -> Result<Rules, String> {
         let mut s = String::new();
         let mut list = Vec::new();
 
@@ -197,16 +199,18 @@ impl Rules {
         let lines = s.lines()
             .map(|l| l.split('#').next().unwrap())
             .map(|l| l.trim())
-            .filter(|l| l.len() != 0);
+            .enumerate()
+            .filter(|(_, l)| l.len() != 0);
 
-        for l in lines {
+        //for (i, l) in lines {
+        for (i, l) in lines {
             match KeyRule::from_str(l) {
-                Some(k) => list.push(k),
-                None => return None
+                Ok(k) => list.push(k),
+                Err(e) => return Err(format!("{}: line {}", e, i+1))
             }
         }
 
-        Some(Rules {
+        Ok(Rules {
             list
         })
     }
@@ -361,9 +365,9 @@ mod test {
         let r = Rules::new("".as_bytes()).unwrap();
         assert_eq!(r.list, vec![]);
 
-        if let Some(_) = Rules::new("->".as_bytes()) { panic!() }
-        if let Some(_) = Rules::new("a->".as_bytes()) { panic!() } 
-        if let Some(_) = Rules::new("->mm".as_bytes()) { panic!() } 
+        if let Ok(_) = Rules::new("->".as_bytes()) { panic!() }
+        if let Ok(_) = Rules::new("a->".as_bytes()) { panic!() } 
+        if let Ok(_) = Rules::new("->mm".as_bytes()) { panic!() } 
 
         let r = Rules::new("A -> B".as_bytes()).unwrap();
         assert_eq!(r.list, vec![
