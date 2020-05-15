@@ -40,7 +40,10 @@ impl Key {
                 },
                 None => return Err(format!("'{}'は無効なキーコードです", s))
             },
-            Some('@') => Ok(Key::Rule(s.to_string())),
+            Some('@') => match s.get(1..) {
+                Some(s) => Ok(Key::Rule(s.to_string())),
+                None => Ok(Key::Rule(String::new())),
+            },
             Some(_) => match KEYCODE.from_keyword(s) {
                 Some(k) => return Ok(Key::Raw(k)),
                 None => return Err(format!("'{}'は無効なキーコードです", s))
