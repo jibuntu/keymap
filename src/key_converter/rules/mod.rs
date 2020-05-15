@@ -3,6 +3,7 @@
 /// キーのリストを受け取り、ルールに合うように変換する。
 
 use std::collections::HashSet;
+use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::cmp::Eq;
 use std::hash::Hash;
@@ -182,16 +183,18 @@ impl KeyRule {
 }
 
 /// ルールの構造体
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Rules {
     list: Vec<KeyRule>,
 }
 
 impl Rules {
     /// ストリームからRulesを作る
-    pub fn new<R: Read>(mut r: R) -> Result<Rules, String> {
+    pub fn new<R: Read>(mut r: R) -> Result<HashMap<String, Rules>, String> {
         let mut s = String::new();
         let mut list = Vec::new();
+        let mut rule_name = String::new();
+        let mut rules_list = HashMap::new();
 
         let _ = r.read_to_string(&mut s);
 
@@ -204,15 +207,33 @@ impl Rules {
 
         //for (i, l) in lines {
         for (i, l) in lines {
-            match KeyRule::from_str(l) {
-                Ok(k) => list.push(k),
-                Err(e) => return Err(format!("{}: line {}", e, i+1))
+            match l.chars().next().unwrap() {
+                // '@'が来たらルールを作成して、rules_listに追加する
+                '@' => match l.get(1..) {
+                    Some(n) => {
+                        let r = Rules::from_vec(list.clone());
+
+                        rules_list.insert(rule_name, r);
+
+                        // listの要素を初期化
+                        list.clear();
+                        // rule_nameを新しいものにする
+                        rule_name = n.to_string();
+                    },
+                    None => return Err(format!("ルール名がありません"))
+                },
+                _ => match KeyRule::from_str(l) {
+                    Ok(k) => list.push(k),
+                    Err(e) => return Err(format!("{}: line {}", e, i+1))
+                }
             }
         }
 
-        Ok(Rules {
-            list
-        })
+        // 最後にrules_listに追加する
+        let r = Rules::from_vec(list.clone());
+        rules_list.insert(rule_name, r);
+
+        Ok(rules_list)
     }
 
     // 一時的に使うテスト用の関数
@@ -362,6 +383,7 @@ impl Rules {
 #[cfg(test)]
 mod test {
     use std::collections::HashSet;
+    use std::collections::HashMap;
     use super::Key;
     use super::KeyRule;
     use super::Rules;
@@ -381,30 +403,66 @@ mod test {
     fn test_rule_new() {
         let code = Keycode::new();
 
-        let r = Rules::new("".as_bytes()).unwrap();
+        let r = Rules::new("".as_bytes()).unwrap().remove("").unwrap();
         assert_eq!(r.list, vec![]);
 
         if let Ok(_) = Rules::new("->".as_bytes()) { panic!() }
         if let Ok(_) = Rules::new("a->".as_bytes()) { panic!() } 
         if let Ok(_) = Rules::new("->mm".as_bytes()) { panic!() } 
 
-        let r = Rules::new("A -> B".as_bytes()).unwrap();
+        let r = Rules::new("A -> B".as_bytes()).unwrap().remove("").unwrap();
         assert_eq!(r.list, vec![
             KeyRule::new(vec![Key::Raw(code.from_keyword("A").unwrap())], vec![Key::Raw(code.from_keyword("B").unwrap())])
         ]);
 
-        let r = Rules::new(r#"
+        let mut r = Rules::new(r#"
         # test
         A -> 'B
         B -> 'A # test
         # aiueo
         C -> 'ENTER
         "#.as_bytes()).unwrap();
-        assert_eq!(r.list, vec![
+        assert_eq!(r.remove("").unwrap().list, vec![
             KeyRule::new(vec![Key::Raw(code.from_keyword("A").unwrap())], vec![Key::Con(code.from_keyword("B").unwrap())]),
             KeyRule::new(vec![Key::Raw(code.from_keyword("B").unwrap())], vec![Key::Con(code.from_keyword("A").unwrap())]),
             KeyRule::new(vec![Key::Raw(code.from_keyword("C").unwrap())], vec![Key::Con(code.from_keyword("ENTER").unwrap())]),
         ]);
+
+        let r = Rules::new(r#"
+        A -> 'B
+        B -> 'A
+        "#.as_bytes()).unwrap();
+        let mut rlist = HashMap::new();
+        rlist.insert("".to_string(), Rules { list: vec![
+            KeyRule::new(vec![Key::Raw(code.from_keyword("A").unwrap())], vec![Key::Con(code.from_keyword("B").unwrap())]),
+            KeyRule::new(vec![Key::Raw(code.from_keyword("B").unwrap())], vec![Key::Con(code.from_keyword("A").unwrap())]),
+        ]});
+        assert_eq!(r, rlist);
+
+        let r = Rules::new(r#"
+        A -> 'B
+        B -> 'A
+        @RULE1
+            M -> 'N
+            N -> 'M
+        
+        @RULE2
+            X + Y -> 'Z
+
+        "#.as_bytes()).unwrap();
+        let mut rlist = HashMap::new();
+        rlist.insert("".to_string(), Rules { list: vec![
+            KeyRule::new(vec![Key::Raw(code.from_keyword("A").unwrap())], vec![Key::Con(code.from_keyword("B").unwrap())]),
+            KeyRule::new(vec![Key::Raw(code.from_keyword("B").unwrap())], vec![Key::Con(code.from_keyword("A").unwrap())]),
+        ]});
+        rlist.insert("RULE1".to_string(), Rules { list: vec![
+            KeyRule::new(vec![Key::Raw(code.from_keyword("M").unwrap())], vec![Key::Con(code.from_keyword("N").unwrap())]),
+            KeyRule::new(vec![Key::Raw(code.from_keyword("N").unwrap())], vec![Key::Con(code.from_keyword("M").unwrap())]),
+        ]});
+        rlist.insert("RULE2".to_string(), Rules { list: vec![
+            KeyRule::new(vec![Key::Raw(code.from_keyword("X").unwrap()), Key::Raw(code.from_keyword("Y").unwrap())], vec![Key::Con(code.from_keyword("Z").unwrap())]),
+        ]});
+        assert_eq!(r, rlist);
     }
 
     #[test]
@@ -435,22 +493,23 @@ mod test {
         let KEY_UP: u16 = code.from_keyword("UP").unwrap();
         let KEY_DOWN: u16 = code.from_keyword("DOWN").unwrap();
 
-        let rule = Rules::new("".as_bytes()).unwrap();
+        let rule = Rules::new("".as_bytes()).unwrap().remove("").unwrap();
         assert_eq!(rule.filter(&hash![Key::Raw(KEY_A)]), vec![Key::Raw(KEY_A)]);
 
-        let mut rule = Rules::new("".as_bytes()).unwrap();
+
+        let mut rule = Rules::new("".as_bytes()).unwrap().remove("").unwrap();
         // A -> 'H
         rule.list.push(KeyRule::new(vec![Key::Raw(KEY_A)], vec![Key::Con(KEY_H)]));
         assert_eq!(rule.filter(&hash![Key::Raw(KEY_A)]), vec![Key::Con(KEY_H)]);
 
-        let mut rule = Rules::new("".as_bytes()).unwrap();
+        let mut rule = Rules::new("".as_bytes()).unwrap().remove("").unwrap();
         // A -> 'H
         rule.list.push(KeyRule::new(vec![Key::Raw(KEY_A)], vec![Key::Con(KEY_H)]));
         // 'H -> 'A
         rule.list.push(KeyRule::new(vec![Key::Con(KEY_H)], vec![Key::Con(KEY_A)]));
         assert_eq!(rule.filter(&hash![Key::Raw(KEY_A)]), vec![Key::Con(KEY_A)]);
 
-        let mut rule = Rules::new("".as_bytes()).unwrap();
+        let mut rule = Rules::new("".as_bytes()).unwrap().remove("").unwrap();
         // B -> 'I 
         rule.list.push(KeyRule::new(vec![Key::Raw(KEY_B)], vec![Key::Con(KEY_I)]));
         // I -> 'B 
@@ -473,7 +532,7 @@ mod test {
         // push I + A + B
         assert_eq!(rule.filter(&hash![Key::Raw(KEY_I), Key::Raw(KEY_A), Key::Raw(KEY_B)]), vec![Key::Con(KEY_I), Key::Con(KEY_ENTER)]);
 
-        let mut rule = Rules::new("".as_bytes()).unwrap();
+        let mut rule = Rules::new("".as_bytes()).unwrap().remove("").unwrap();
         // B -> 'I 
         rule.list.push(KeyRule::new(vec![Key::Raw(KEY_B)], vec![Key::Con(KEY_I)]));
         // ALT -> 'CTRL 

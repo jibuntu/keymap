@@ -2,6 +2,7 @@
 /// キーを変換するためのモジュール
 
 use std::collections::HashSet;
+use std::collections::HashMap;
 use std::io::Read;
 
 mod rules;
@@ -12,19 +13,25 @@ use self::rules::Key;
 pub struct KeyConverter {
     keys: HashSet<Key>, // 実際に押されているキーのリスト
     vkeys: Vec<Key>, // 仮想的に押されているキーのリスト
-    rules: Rules,
+    rules_list: HashMap<String, Box<Rules>>,
+    rules: Box<Rules>,
 }
 
 impl KeyConverter {
     pub fn new<R: Read>(r: R) -> Result<KeyConverter, String> {
-        let rules = match Rules::new(r) {
+        let rules_list = match Rules::new(r) {
             Ok(rules) => rules,
             Err(e) => return Err(e)
         };
 
+        let mut rules_list: HashMap<String, Box<Rules>> = 
+             rules_list.into_iter().map(|(s, r)| (s, Box::new(r))).collect();
+        let rules = rules_list.remove("").unwrap();
+
         Ok(KeyConverter {
             keys: HashSet::new(),
             vkeys: Vec::new(),
+            rules_list,
             rules
         })
     }
