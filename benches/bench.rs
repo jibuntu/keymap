@@ -49,7 +49,6 @@ pub fn rules_benchmark(c: &mut Criterion) {
 
     // 最終的には'altに変換される
     k.insert(Key::Raw(key_b));
-    assert_eq!(rules.filter(&k), HashSet::from_iter(vec![Key::Con(key_alt)].into_iter()));
     c.bench_function("Rule::filter 3", |b| b.iter(|| rules.filter(&k)));
 }
 
@@ -58,7 +57,7 @@ pub fn rules_benchmark(c: &mut Criterion) {
 mod key_converter;
 use key_converter::KeyConverter;
 pub fn key_converter_benchmark(c: &mut Criterion) {
-    let mut kc = KeyConverter::new();
+    let mut kc = KeyConverter::new("".as_bytes()).unwrap();
     let code = Keycode::new();
     let key_a = code.from_keyword("A").unwrap();
     let key_n = code.from_keyword("N").unwrap();
