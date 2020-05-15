@@ -19,7 +19,7 @@ fn loop_keymap(kbd: Keyboard,
                mut kc: KeyConverter, 
                show_state: bool) 
     {
-    let mut last_push = 0;
+    let mut last_push = None;
 
     loop {
         let (_, read_code, state) = kbd.read_key();
@@ -29,7 +29,11 @@ fn loop_keymap(kbd: Keyboard,
             // push
             1 => {
                 let (push, leave) = kc.push(read_code);
-                last_push = *push.last().unwrap();
+                if let Some(p) = push.last() {
+                    last_push = Some(*p);
+                } else {
+                    last_push = None;
+                }
 
                 for l in &leave {
                     vkbd.leave(*l);
@@ -54,7 +58,9 @@ fn loop_keymap(kbd: Keyboard,
             // repeat
             2 => {
                 // 最後にvkbdにpushされたキーコードをrepeatする
-                vkbd.repeat(last_push);
+                if let Some(p) = last_push {
+                    vkbd.repeat(p);
+                }
 
                 (None, None)
             },
@@ -82,7 +88,9 @@ fn loop_keymap(kbd: Keyboard,
                 print!("leave {} ", l);
             }
             if state == 2 {
-                print!("repeat {} ", last_push);
+                if let Some(p) = last_push {
+                    print!("repeat {} ", p);
+                }
             }
             println!();
 
