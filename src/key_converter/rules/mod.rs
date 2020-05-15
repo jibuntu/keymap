@@ -102,22 +102,22 @@ mod test_key {
 /// KeyRule
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KeyRule {
-    k: HashSet<Key>,
-    v: HashSet<Key>,
+    k: Vec<Key>,
+    v: Vec<Key>,
 }
 
 impl KeyRule {
     pub fn new(k: Vec<Key>, v: Vec<Key>) -> KeyRule {
         KeyRule {
-            k: HashSet::from_iter(k.into_iter()),
-            v: HashSet::from_iter(v.into_iter())
+            k: k,
+            v: v
         }
     }
 
     // 文字列からKeyRuleを作成する
     pub fn from_str(s: &str) -> Result<KeyRule, String> {
-        let mut klist = HashSet::new();
-        let mut vlist = HashSet::new();
+        let mut klist = Vec::new();
+        let mut vlist = Vec::new();
 
         let mut s = s.split("->");
         let kstr = match s.next() {
@@ -132,7 +132,7 @@ impl KeyRule {
         for k in kstr.split("+").map(|k| k.trim()) {
             match Key::from_str(k) {
                 Ok(k) => {
-                    klist.insert(k);
+                    klist.push(k);
                 },
                 Err(e) => return Err(e)
             }
@@ -141,7 +141,7 @@ impl KeyRule {
         for v in vstr.split("+").map(|v| v.trim()) {
             match Key::from_str(v) {
                 Ok(v) => {
-                    vlist.insert(v);
+                    vlist.push(v);
                 },
                 Err(e) => return Err(e)
             }
@@ -259,59 +259,78 @@ impl Rules {
     /// 第二引数のmatched_rulesはすでにマッチしているルールへの参照。同じルール
     /// に複数回マッチしないようにするため。
     fn filter_recursion<'a>(&'a self, 
-                            keys: &mut HashSet<Key>, 
+                            keys: &mut Vec<Key>, 
                             matched_rules: &mut Vec<&'a KeyRule>) 
     {
-        for key_rule in &self.list {
+        'outer: for key_rule in &self.list {
             // matched_rulesに入っているルールを除外した上でサブセットかどうか
-            if !matched_rules.contains(&key_rule) && key_rule.k.is_subset(&keys) {
-                // println!("MATCH: {:?} -> {:?}", key_rule.k, key_rule.v);
-
-                // マッチしたルールをmatched_rulesに追加する
-                matched_rules.push(key_rule);
-
-                // マッチしたルールの値をすべてkeysに入れる
-                for v in &key_rule.v {
-                    keys.insert(v.clone());
-                }
-
-                // 新しくkeysをセットしたので、それをもとに再帰的に呼び出す
-                self.filter_recursion(keys, matched_rules);
-
-                // いずれかにマッチした時点でループをやめる
-                break
+            if matched_rules.contains(&key_rule) {
+                continue;
             }
+            
+            for k in &key_rule.k {
+                if !keys.contains(&k) {
+                    continue 'outer;
+                }
+            }
+
+            // println!("MATCH: {:?} -> {:?}", key_rule.k, key_rule.v);
+
+            // マッチしたルールをmatched_rulesに追加する
+            matched_rules.push(key_rule);
+
+            // マッチしたルールの値をすべてkeysに入れる
+            for v in &key_rule.v {
+                // すでにあるものは除外する
+                if !keys.contains(&v) {
+                    keys.push(v.clone());
+                }
+            }
+
+            // 新しくkeysをセットしたので、それをもとに再帰的に呼び出す
+            self.filter_recursion(keys, matched_rules);
+
+            // いずれかにマッチした時点でループをやめる
+            break
         }
     }
     
     // ルールを元に引数のKeysをvkeysに変換する
-    pub fn filter(&self, keys: &HashSet<Key>) -> HashSet<Key> {
+    pub fn filter(&self, keys: &HashSet<Key>) -> Vec<Key> {
         let mut matched_rules = Vec::new();
         // vkeysの初期値は、keysの値
-        let mut vkeys = keys.clone();
+        let mut vkeys: Vec<Key> = Vec::from_iter(keys.iter().map(|k| k.clone()));
+        let mut result: Vec<Key> = Vec::new();
 
         // vkeysとmatched_rulesの値をセットする
         self.filter_recursion(&mut vkeys, &mut matched_rules);
+        let keys: Vec<Key> = matched_rules.iter().map(|r| r.k.clone()).flatten().collect();
 
         // ルールのキーとして使われているのにvkeysに入っているキーを削除する
         // また、ルールのキーにマッチしなかったキーはそのまま残る
-        for k in matched_rules.iter().map(|r| &r.k).flatten() {
-            vkeys.remove(k);
+        for vk in vkeys {
+            if !keys.contains(&vk) {
+                result.push(vk.clone());
+            }
         }
-
-        vkeys
+        
+        result
     }
 
     // ルールを元に引数のKeysをvkeysに変換し、それを文字列にする
     pub fn filter_to_string(&self, keys: &HashSet<Key>) -> String {
         // 最初はfilter関数と同じ処理
         let mut matched_rules = Vec::new();
-        let mut vkeys = keys.clone();
-        
+        let mut vkeys: Vec<Key> = Vec::from_iter(keys.iter().map(|k| k.clone()));
+        let mut result: Vec<Key> = Vec::new();
+
         self.filter_recursion(&mut vkeys, &mut matched_rules);
-        
-        for k in matched_rules.iter().map(|r| &r.k).flatten() {
-            vkeys.remove(k);
+        let keys: Vec<Key> = matched_rules.iter().map(|r| r.k.clone()).flatten().collect();
+
+        for vk in &vkeys {
+            if !keys.contains(&vk) {
+                result.push(vk.clone());
+            }
         }
 
         // ここから文字列へ変換してゆく
@@ -417,20 +436,19 @@ mod test {
         let KEY_DOWN: u16 = code.from_keyword("DOWN").unwrap();
 
         let rule = Rules::new("".as_bytes()).unwrap();
-        assert_eq!(rule.filter(&hash![Key::Raw(KEY_A)]), hash![Key::Raw(KEY_A)]);
+        assert_eq!(rule.filter(&hash![Key::Raw(KEY_A)]), vec![Key::Raw(KEY_A)]);
 
         let mut rule = Rules::new("".as_bytes()).unwrap();
         // A -> 'H
         rule.list.push(KeyRule::new(vec![Key::Raw(KEY_A)], vec![Key::Con(KEY_H)]));
-        assert_eq!(rule.filter(&hash![Key::Raw(KEY_A)]), hash![Key::Con(KEY_H)]);
+        assert_eq!(rule.filter(&hash![Key::Raw(KEY_A)]), vec![Key::Con(KEY_H)]);
 
         let mut rule = Rules::new("".as_bytes()).unwrap();
         // A -> 'H
         rule.list.push(KeyRule::new(vec![Key::Raw(KEY_A)], vec![Key::Con(KEY_H)]));
         // 'H -> 'A
         rule.list.push(KeyRule::new(vec![Key::Con(KEY_H)], vec![Key::Con(KEY_A)]));
-        assert_eq!(rule.filter(&hash![Key::Raw(KEY_A)]), hash![Key::Con(KEY_A)]);
-
+        assert_eq!(rule.filter(&hash![Key::Raw(KEY_A)]), vec![Key::Con(KEY_A)]);
 
         let mut rule = Rules::new("".as_bytes()).unwrap();
         // B -> 'I 
@@ -443,17 +461,17 @@ mod test {
         rule.list.push(KeyRule::new(vec![Key::Con(KEY_B), Key::Con(KEY_C)], vec![Key::Con(KEY_ENTER)]));
 
         // push B
-        assert_eq!(rule.filter(&hash![Key::Raw(KEY_B)]), hash![Key::Con(KEY_I)]);
+        assert_eq!(rule.filter(&hash![Key::Raw(KEY_B)]), vec![Key::Con(KEY_I)]);
         // push I
-        assert_eq!(rule.filter(&hash![Key::Raw(KEY_I)]), hash![Key::Con(KEY_B)]);
+        assert_eq!(rule.filter(&hash![Key::Raw(KEY_I)]), vec![Key::Con(KEY_B)]);
         // push A
-        assert_eq!(rule.filter(&hash![Key::Raw(KEY_A)]), hash![Key::Con(KEY_C)]);
+        assert_eq!(rule.filter(&hash![Key::Raw(KEY_A)]), vec![Key::Con(KEY_C)]);
         // push B + I 
-        assert_eq!(rule.filter(&hash![Key::Raw(KEY_B), Key::Raw(KEY_I)]), hash![Key::Con(KEY_I), Key::Con(KEY_B)]);
+        assert_eq!(rule.filter(&hash![Key::Raw(KEY_B), Key::Raw(KEY_I)]), vec![Key::Con(KEY_I), Key::Con(KEY_B)]);
         // push I + A // ここでは'B + 'Cに変換され、その後'ENTREに変換される
-        assert_eq!(rule.filter(&hash![Key::Raw(KEY_I), Key::Raw(KEY_A)]), hash![Key::Con(KEY_ENTER)]);
+        assert_eq!(rule.filter(&hash![Key::Raw(KEY_I), Key::Raw(KEY_A)]), vec![Key::Con(KEY_ENTER)]);
         // push I + A + B
-        assert_eq!(rule.filter(&hash![Key::Raw(KEY_I), Key::Raw(KEY_A), Key::Raw(KEY_B)]), hash![Key::Con(KEY_ENTER), Key::Con(KEY_I)]);
+        assert_eq!(rule.filter(&hash![Key::Raw(KEY_I), Key::Raw(KEY_A), Key::Raw(KEY_B)]), vec![Key::Con(KEY_I), Key::Con(KEY_ENTER)]);
 
         let mut rule = Rules::new("".as_bytes()).unwrap();
         // B -> 'I 
@@ -467,16 +485,16 @@ mod test {
         // 'J + 'CTRL -> 'SHIFT
         rule.list.push(KeyRule::new(vec![Key::Con(KEY_J), Key::Con(KEY_CTRL)], vec![Key::Con(KEY_SHIFT)]));
         // push B + ALT = 'ENTER
-        assert_eq!(rule.filter(&hash![Key::Raw(KEY_B), Key::Raw(KEY_ALT)]), hash![Key::Con(KEY_ENTER)]);
+        assert_eq!(rule.filter(&hash![Key::Raw(KEY_B), Key::Raw(KEY_ALT)]), vec![Key::Con(KEY_ENTER)]);
         // push C + ALT = 'SHIFT
-        assert_eq!(rule.filter(&hash![Key::Raw(KEY_C), Key::Raw(KEY_ALT)]), hash![Key::Con(KEY_SHIFT)]);
+        assert_eq!(rule.filter(&hash![Key::Raw(KEY_C), Key::Raw(KEY_ALT)]), vec![Key::Con(KEY_SHIFT)]);
         // push B + C + ALT = 'ENTER + 'SHIFT
-        assert_eq!(rule.filter(&hash![Key::Raw(KEY_B), Key::Raw(KEY_C), Key::Raw(KEY_ALT)]), hash![Key::Con(KEY_ENTER), Key::Con(KEY_SHIFT)]);
+        assert_eq!(rule.filter(&hash![Key::Raw(KEY_B), Key::Raw(KEY_C), Key::Raw(KEY_ALT)]), vec![Key::Con(KEY_ENTER), Key::Con(KEY_SHIFT)]);
 
         // 'ENTER + 'SHIFT -> 'A
         rule.list.push(KeyRule::new(vec![Key::Con(KEY_ENTER), Key::Con(KEY_SHIFT)], vec![Key::Con(KEY_A)]));
         // push B + C + ALT = 'A
-        assert_eq!(rule.filter(&hash![Key::Raw(KEY_B), Key::Raw(KEY_C), Key::Raw(KEY_ALT)]), hash![Key::Con(KEY_A)]);
+        assert_eq!(rule.filter(&hash![Key::Raw(KEY_B), Key::Raw(KEY_C), Key::Raw(KEY_ALT)]), vec![Key::Con(KEY_A)]);
 
         // 'ENTER + 'SHIFT + BACKSPACE + TAB -> 'LEFT + 'RIGHT + 'UP + 'DOWN
         rule.list.push(
@@ -488,7 +506,7 @@ mod test {
         // push B + C + ALT + BACKSPACE + TAB = 'A + 'LEFT + 'RIGHT + 'UP + 'DOWN
         // B + C + ALTを変換した後の'ENTER + 'SHIFTは'Aになり、
         // その上で今回のルールのキーにもなっている
-        assert_eq!(rule.filter(&hash![Key::Raw(KEY_B), Key::Raw(KEY_C), Key::Raw(KEY_ALT), Key::Raw(KEY_BACKSPACE), Key::Raw(KEY_TAB)]), hash![Key::Con(KEY_A), Key::Con(KEY_LEFT), Key::Con(KEY_RIGHT), Key::Con(KEY_UP), Key::Con(KEY_DOWN)]);
+        assert_eq!(rule.filter(&hash![Key::Raw(KEY_B), Key::Raw(KEY_C), Key::Raw(KEY_ALT), Key::Raw(KEY_BACKSPACE), Key::Raw(KEY_TAB)]), vec![Key::Con(KEY_A), Key::Con(KEY_LEFT), Key::Con(KEY_RIGHT), Key::Con(KEY_UP), Key::Con(KEY_DOWN)]);
 
         // 'A + 'LEFT + 'RIGHT + 'UP + 'DOWN -> 'F
         rule.list.push(
@@ -498,6 +516,6 @@ mod test {
             )
         );
         // push B + C + ALT + BACKSPACE + TAB = 'F
-        assert_eq!(rule.filter(&hash![Key::Raw(KEY_B), Key::Raw(KEY_C), Key::Raw(KEY_ALT), Key::Raw(KEY_BACKSPACE), Key::Raw(KEY_TAB)]), hash![Key::Con(KEY_F)]);
+        assert_eq!(rule.filter(&hash![Key::Raw(KEY_B), Key::Raw(KEY_C), Key::Raw(KEY_ALT), Key::Raw(KEY_BACKSPACE), Key::Raw(KEY_TAB)]), vec![Key::Con(KEY_F)]);
     }
 }
