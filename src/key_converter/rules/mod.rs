@@ -23,14 +23,15 @@ lazy_static! {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Key {
     Raw(u16), // 変換される前のキー
-    Con(u16) // 変換された後のキー (convert)
+    Con(u16), // 変換された後のキー (convert)
+    Rule(String) // ルール名
 }
 
 impl Key {
     /// 文字列からKeyを作成する
     pub fn from_str(s: &str) -> Result<Key, String> {
-        if s.chars().next() == Some('\'') {
-            match s.get(1..) {
+        match s.chars().next() {
+            Some('\'') => match s.get(1..) {
                 Some(s) => match KEYCODE.from_keyword(s) {
                     Some(k) => return Ok(Key::Con(k)),
                     None => {
@@ -38,19 +39,21 @@ impl Key {
                     }
                 },
                 None => return Err(format!("'{}'は無効なキーコードです", s))
-            }
-        } else {
-            match KEYCODE.from_keyword(s) {
+            },
+            Some('@') => Ok(Key::Rule(s.to_string())),
+            Some(_) => match KEYCODE.from_keyword(s) {
                 Some(k) => return Ok(Key::Raw(k)),
                 None => return Err(format!("'{}'は無効なキーコードです", s))
-            }
+            },
+            None => return Err(format!("'{}'は無効なキーコードです", s))
         }
     }
 
-    pub fn to_u16(&self) -> u16 {
+    pub fn to_u16(&self) -> Option<u16> {
         match self {
-            Key::Raw(n) => *n,
-            Key::Con(n) => *n
+            Key::Raw(n) => Some(*n),
+            Key::Con(n) => Some(*n),
+            Key::Rule(_) => None
         }
     }
 
@@ -63,7 +66,8 @@ impl Key {
             Key::Con(n) => {
                 "'".to_string() + &KEYCODE.from_keycode(*n)
                                           .unwrap_or("UNKNOWN".to_string())
-            }
+            },
+            Key::Rule(s) => s.clone()
         };
 
         s
@@ -448,7 +452,7 @@ mod test {
         
         @RULE2
             X + Y -> 'Z
-
+            ENTER -> @RULE1
         "#.as_bytes()).unwrap();
         let mut rlist = HashMap::new();
         rlist.insert("".to_string(), Rules { list: vec![
@@ -461,6 +465,7 @@ mod test {
         ]});
         rlist.insert("RULE2".to_string(), Rules { list: vec![
             KeyRule::new(vec![Key::Raw(code.from_keyword("X").unwrap()), Key::Raw(code.from_keyword("Y").unwrap())], vec![Key::Con(code.from_keyword("Z").unwrap())]),
+            KeyRule::new(vec![Key::Raw(code.from_keyword("ENTER").unwrap())], vec![Key::Rule("@RULE1".to_string())]),
         ]});
         assert_eq!(r, rlist);
     }

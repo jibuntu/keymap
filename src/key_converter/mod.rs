@@ -45,13 +45,13 @@ impl KeyConverter {
         // vk - vkeys の結果のキーを押す
         let push = vk.iter()
              .filter(|k| !self.vkeys.contains(&k))
-             .map(|k| k.to_u16()).collect();
+             .map(|k| k.to_u16().unwrap()).collect();
 
         // vkeysに入っていて、vkに入っていないキーを離す
         // vkeys - vk の結果のキーを離す
         let leave = self.vkeys.iter()
              .filter(|k| !vk.contains(&k))
-             .map(|k| k.to_u16()).collect();
+             .map(|k| k.to_u16().unwrap()).collect();
 
         // self.vkeysの値を更新する
         self.vkeys = vk;
@@ -70,7 +70,7 @@ impl KeyConverter {
         // vkeys - vk の結果のキーを離す
         let leave = self.vkeys.iter()
              .filter(|k| !vk.contains(&k))
-             .map(|k| k.to_u16()).collect();
+             .map(|k| k.to_u16().unwrap()).collect();
 
         // self.vkeysの値を更新する
         self.vkeys = vk;
