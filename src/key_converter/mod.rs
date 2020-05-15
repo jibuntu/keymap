@@ -14,7 +14,7 @@ pub struct KeyConverter {
     keys: HashSet<Key>, // 実際に押されているキーのリスト
     vkeys: Vec<Key>, // 仮想的に押されているキーのリスト
     rules_list: HashMap<String, Box<Rules>>,
-    rules: Box<Rules>,
+    rules: Option<Box<Rules>>,
 }
 
 impl KeyConverter {
@@ -32,7 +32,7 @@ impl KeyConverter {
             keys: HashSet::new(),
             vkeys: Vec::new(),
             rules_list,
-            rules
+            rules: Some(rules)
         })
     }
     
@@ -40,7 +40,33 @@ impl KeyConverter {
     /// 返り値は押すキーと離すキー
     pub fn push(&mut self, k: u16) -> (Vec<u16>, Vec<u16>) {
         self.keys.insert(Key::Raw(k));
-        let vk = self.rules.filter(&self.keys);
+        let vk = self.rules.as_ref().unwrap().filter(&self.keys);
+
+        // ルールを変える場合は何も押さずに全て離す
+        for v in &vk {
+            let name = if let Key::Rule(name) = v {
+                name
+            } else {
+                continue;
+            };
+
+            //// 新しいルールをself.rulesに入れる
+            let new = self.rules_list.remove(name).unwrap();
+            let old = self.rules.replace(new).unwrap();
+
+            //// 以前のルールをself.rules_listに入れる
+            self.rules_list.insert(old.get_name().to_string(), old);
+        
+            // 何も押さずに、すべてのキーを離す
+            let vkeys = self.vkeys.iter()
+                .map(|v| v.to_u16().unwrap()).collect();
+            self.vkeys.clear();
+
+            // 実際に押されているキーもすべてなかったことにする
+            self.keys.clear();
+
+            return (Vec::new(), vkeys)
+        }
 
         // vk - vkeys の結果のキーを押す
         let push = vk.iter()
@@ -64,7 +90,7 @@ impl KeyConverter {
     /// 返り値は離すキーのリスト
     pub fn leave(&mut self, k: u16) -> Vec<u16> { 
         self.keys.remove(&Key::Raw(k));
-        let vk = self.rules.filter(&self.keys);
+        let vk = self.rules.as_ref().unwrap().filter(&self.keys);
         
         // vkeysに入っていて、vkに入っていないキーを離す
         // vkeys - vk の結果のキーを離す
@@ -79,7 +105,7 @@ impl KeyConverter {
     }
 
     pub fn filter_to_string(&mut self) -> String {
-        self.rules.filter_to_string(&self.keys)
+        self.rules.as_ref().unwrap().filter_to_string(&self.keys)
     }
 }
 

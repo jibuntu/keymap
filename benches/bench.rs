@@ -36,7 +36,7 @@ pub fn rules_benchmark(c: &mut Criterion) {
         // 'ENTER + 'D -> 'ALT
         KeyRule::new(vec![Key::Con(key_enter), Key::Con(key_d)], vec![Key::Con(key_alt)]),
     ];
-    let rules = Rules::from_vec(v);
+    let rules = Rules::from_vec(&"", v);
     let mut k = HashSet::new();
     k.insert(Key::Raw(key_a));
 
