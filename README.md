@@ -10,11 +10,28 @@ F -> 'A
 J -> 'B
 
 
-# You can use multiple keys when changing.
+# You can multiple keys when changing.
 
 'LeftCtrl + 'A -> 'BackSpace
 
-'LeftCtrl + 'B -> 'LeftCtrl + 'SHIFT + 'T
+'LeftCtrl + 'B -> 'LeftCtrl + 'RightShift + 'T
+
+
+# You can change rules when pushed key.
+
+Q -> @RULE_1
+
+@RULE_1
+  F -> 'B
+  J -> 'A
+
+  LeftCtrl + Q -> @RULE_2
+
+@RULE_2
+  F -> 'C
+  J -> 'D
+
+  LeftCtrl + Q -> @RULE_1
 
 $ cargo build --release
 $ sudo target/release/keymap test/keymap.txt
