@@ -189,6 +189,7 @@ impl KeyRule {
 /// ルールの構造体
 #[derive(Debug, Clone, PartialEq)]
 pub struct Rules {
+    name: String,
     list: Vec<KeyRule>,
 }
 
@@ -215,7 +216,7 @@ impl Rules {
                 // '@'が来たらルールを作成して、rules_listに追加する
                 '@' => match l.get(1..) {
                     Some(n) => {
-                        let r = Rules::from_vec(list.clone());
+                        let r = Rules::from_vec(&rule_name, list.clone());
 
                         rules_list.insert(rule_name, r);
 
@@ -234,7 +235,7 @@ impl Rules {
         }
 
         // 最後にrules_listに追加する
-        let r = Rules::from_vec(list.clone());
+        let r = Rules::from_vec(&rule_name, list.clone());
         rules_list.insert(rule_name, r);
 
         Ok(rules_list)
@@ -244,6 +245,7 @@ impl Rules {
     // 本当はRules構造体はファイルから作成する
     pub fn test_new() -> Rules {
         Rules {
+            name: String::new(),
             list: vec![
                 KeyRule::new(
                     vec![Key::Raw(KEYCODE.from_keyword("A").unwrap())], 
@@ -273,10 +275,15 @@ impl Rules {
         }
     }
 
-    pub fn from_vec(v: Vec<KeyRule>) -> Rules {
+    pub fn from_vec(name: &str, v: Vec<KeyRule>) -> Rules {
         Rules {
+            name: name.to_string(),
             list: v
         }
+    }
+
+    pub fn get_name(&self) -> &str {
+        &self.name
     }
 
     /// 再帰的に実行する関数。
@@ -437,7 +444,7 @@ mod test {
         B -> 'A
         "#.as_bytes()).unwrap();
         let mut rlist = HashMap::new();
-        rlist.insert("".to_string(), Rules { list: vec![
+        rlist.insert("".to_string(), Rules { name: String::new(), list: vec![
             KeyRule::new(vec![Key::Raw(code.from_keyword("A").unwrap())], vec![Key::Con(code.from_keyword("B").unwrap())]),
             KeyRule::new(vec![Key::Raw(code.from_keyword("B").unwrap())], vec![Key::Con(code.from_keyword("A").unwrap())]),
         ]});
@@ -455,15 +462,15 @@ mod test {
             ENTER -> @RULE1
         "#.as_bytes()).unwrap();
         let mut rlist = HashMap::new();
-        rlist.insert("".to_string(), Rules { list: vec![
+        rlist.insert("".to_string(), Rules { name: String::new(), list: vec![
             KeyRule::new(vec![Key::Raw(code.from_keyword("A").unwrap())], vec![Key::Con(code.from_keyword("B").unwrap())]),
             KeyRule::new(vec![Key::Raw(code.from_keyword("B").unwrap())], vec![Key::Con(code.from_keyword("A").unwrap())]),
         ]});
-        rlist.insert("RULE1".to_string(), Rules { list: vec![
+        rlist.insert("RULE1".to_string(), Rules { name: "RULE1".to_string(), list: vec![
             KeyRule::new(vec![Key::Raw(code.from_keyword("M").unwrap())], vec![Key::Con(code.from_keyword("N").unwrap())]),
             KeyRule::new(vec![Key::Raw(code.from_keyword("N").unwrap())], vec![Key::Con(code.from_keyword("M").unwrap())]),
         ]});
-        rlist.insert("RULE2".to_string(), Rules { list: vec![
+        rlist.insert("RULE2".to_string(), Rules { name: "RULE2".to_string(), list: vec![
             KeyRule::new(vec![Key::Raw(code.from_keyword("X").unwrap()), Key::Raw(code.from_keyword("Y").unwrap())], vec![Key::Con(code.from_keyword("Z").unwrap())]),
             KeyRule::new(vec![Key::Raw(code.from_keyword("ENTER").unwrap())], vec![Key::Rule("@RULE1".to_string())]),
         ]});
