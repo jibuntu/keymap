@@ -153,7 +153,7 @@ fn print_help() {
     println!("    <rule>    ルールを記述したファイルを指定します");
     println!();
     println!("options:");
-    println!("    -s, --show-stats    実行中にキーの状態を出力します");
+    println!("    -s, --show-state    実行中にキーの状態を出力します");
     println!("    -r, --rule          ルールを適用しますが、実際に変換後のキーが入力されることはありません");
 }
 
