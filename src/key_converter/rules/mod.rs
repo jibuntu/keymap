@@ -475,7 +475,7 @@ mod test {
         ]});
         rlist.insert("RULE2".to_string(), Rules { name: "RULE2".to_string(), list: vec![
             KeyRule::new(vec![Key::Raw(code.from_keyword("X").unwrap()), Key::Raw(code.from_keyword("Y").unwrap())], vec![Key::Con(code.from_keyword("Z").unwrap())]),
-            KeyRule::new(vec![Key::Raw(code.from_keyword("ENTER").unwrap())], vec![Key::Rule("@RULE1".to_string())]),
+            KeyRule::new(vec![Key::Raw(code.from_keyword("ENTER").unwrap())], vec![Key::Rule("RULE1".to_string())]),
         ]});
         assert_eq!(r, rlist);
     }
