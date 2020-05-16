@@ -35,6 +35,10 @@ impl KeyConverter {
             rules: Some(rules)
         })
     }
+
+    pub fn get_rules_name(&self) -> String {
+        self.rules.as_ref().unwrap().get_name().to_string()
+    }
     
     /// 前回とのvkeysの差分を元に返り値を返す。
     /// 返り値は押すキーと離すキー

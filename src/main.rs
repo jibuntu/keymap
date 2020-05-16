@@ -70,7 +70,7 @@ fn loop_keymap(kbd: Keyboard,
         // キーの状態を表示する
         if show_state {
             // 現実世界のキーボードで入力された値を表示
-            print!("\t kbd | ");
+            print!("\t{:>15} | ", "kbd");
             match state {
                 0 => print!("leave "),
                 1 => print!("push "),
@@ -80,7 +80,7 @@ fn loop_keymap(kbd: Keyboard,
             println!("{}", read_code);
 
             // 仮想的なキーボードで入力された値を表示
-            print!("\tvkbd | ");
+            print!("\t{:>15} | ", "vkbd");
             for p in push.unwrap_or(Vec::new()) {
                 print!("push {} ", p);
             }
@@ -95,7 +95,9 @@ fn loop_keymap(kbd: Keyboard,
             println!();
 
             // 押されているキーをルールに適用した結果を表示
-            println!("\trule | {}", kc.filter_to_string());
+            let name = format!("@{}", kc.get_rules_name());
+            println!("\t{:>15} | {}", name, kc.filter_to_string());
+
             println!()
         }
     }
@@ -123,7 +125,7 @@ fn loop_keymap_without_vkbd(kbd: Keyboard, mut kc: KeyConverter) {
 
         // キーの状態を表示する
         // 現実世界のキーボードで入力された値を表示
-        print!("\t kbd | ");
+        print!("\t{:>15} | ", "kbd");
         match state {
             0 => print!("leave "),
             1 => print!("push "),
@@ -133,10 +135,12 @@ fn loop_keymap_without_vkbd(kbd: Keyboard, mut kc: KeyConverter) {
         println!("{}", read_code);
 
         // 仮想的なキーボードで入力された値を表示しない
-        println!("\tvkbd | ");
+        println!("\t{:>15} | ", "vkbd");
 
         // 押されているキーをルールに適用した結果を表示
-        println!("\trule | {}", kc.filter_to_string());
+        let name = format!("@{}", kc.get_rules_name());
+        println!("\t{:>15} | {}", name, kc.filter_to_string());
+
         println!()
     }
 }
