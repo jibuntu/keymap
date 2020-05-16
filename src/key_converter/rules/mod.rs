@@ -348,9 +348,9 @@ impl Rules {
             }
         }
 
-        for (i, v) in vkeys.iter().enumerate() {
-            s += &v.to_string();
-            if i != vkeys.len()-1 {
+        for (i, k) in result.iter().enumerate() {
+            s += &k.to_string();
+            if i != result.len()-1 {
                 s += " + ";
             }
         }
