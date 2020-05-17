@@ -14,6 +14,7 @@ pub struct KeyConverter {
     keys: HashSet<Key>, // 実際に押されているキーのリスト
     vkeys: Vec<Key>, // 仮想的に押されているキーのリスト
     rules_list: HashMap<String, Box<Rules>>,
+    rules_name: Option<String>, // 現在選択されているRulesの名前
     rules: Option<Box<Rules>>,
 }
 
@@ -26,18 +27,19 @@ impl KeyConverter {
 
         let mut rules_list: HashMap<String, Box<Rules>> = 
              rules_list.into_iter().map(|(s, r)| (s, Box::new(r))).collect();
-        let rules = rules_list.remove("").unwrap();
+        let (name, rules) = rules_list.remove_entry("").unwrap();
 
         Ok(KeyConverter {
             keys: HashSet::new(),
             vkeys: Vec::new(),
             rules_list,
+            rules_name: Some(name),
             rules: Some(rules)
         })
     }
 
-    pub fn get_rules_name(&self) -> String {
-        self.rules.as_ref().unwrap().get_name().to_string()
+    pub fn get_rules_name(&self) -> &str {
+        self.rules_name.as_ref().unwrap()
     }
     
     /// 前回とのvkeysの差分を元に返り値を返す。
@@ -49,6 +51,10 @@ impl KeyConverter {
         // ルールを変える場合は何も押さずに全て離す
         for v in &vk {
             let name = if let Key::Rule(name) = v {
+                // 現在のルールと同じだったらcontinueする
+                if self.rules_name.as_ref().unwrap() == name {
+                    continue;
+                }
                 name
             } else {
                 continue;
@@ -57,9 +63,10 @@ impl KeyConverter {
             //// 新しいルールをself.rulesに入れる
             let new = self.rules_list.remove(name).unwrap();
             let old = self.rules.replace(new).unwrap();
+            let old_name = self.rules_name.replace(name.to_string()).unwrap();
 
             //// 以前のルールをself.rules_listに入れる
-            self.rules_list.insert(old.get_name().to_string(), old);
+            self.rules_list.insert(old_name, old);
         
             // 何も押さずに、すべてのキーを離す
             let vkeys = self.vkeys.iter()
@@ -72,16 +79,18 @@ impl KeyConverter {
             return (Vec::new(), vkeys)
         }
 
+        // Key::Ruleは除外する
         // vk - vkeys の結果のキーを押す
         let push = vk.iter()
              .filter(|k| !self.vkeys.contains(&k))
-             .map(|k| k.to_u16().unwrap()).collect();
+             .filter_map(|k| k.to_u16()).collect();
 
         // vkeysに入っていて、vkに入っていないキーを離す
+        // Key::Ruleは除外する
         // vkeys - vk の結果のキーを離す
         let leave = self.vkeys.iter()
              .filter(|k| !vk.contains(&k))
-             .map(|k| k.to_u16().unwrap()).collect();
+             .filter_map(|k| k.to_u16()).collect();
 
         // self.vkeysの値を更新する
         self.vkeys = vk;
@@ -97,10 +106,11 @@ impl KeyConverter {
         let vk = self.rules.as_ref().unwrap().filter(&self.keys);
         
         // vkeysに入っていて、vkに入っていないキーを離す
+        // Key::Ruleは除外する
         // vkeys - vk の結果のキーを離す
         let leave = self.vkeys.iter()
              .filter(|k| !vk.contains(&k))
-             .map(|k| k.to_u16().unwrap()).collect();
+             .filter_map(|k| k.to_u16()).collect();
 
         // self.vkeysの値を更新する
         self.vkeys = vk;
