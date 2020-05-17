@@ -193,7 +193,80 @@ impl KeyRule {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Rules {
     name: String,
+    extend: Option<String>, // 継承するルール名
     list: Vec<KeyRule>,
+}
+
+/// 再帰的に継承をする
+/// 引数のnameのルールの継承を適用する
+fn attach_ex_recursion(rules_list: &mut HashMap<String, Rules>, 
+                       extended_names: &mut HashSet<String>, 
+                       name_history: &mut HashSet<String>,
+                       name: String) -> Result<(), String>
+{
+    let r = match rules_list.get(&name) {
+        Some(r) => r,
+        None => return Err(format!("'{}'というルールは存在しません", name))
+    };
+
+    // 継承先がなければ何もしない
+    if let None = r.extend {
+        return Ok(())
+    }
+
+    // 継承が循環していたらエラーを返す
+    if name_history.contains(&name) {
+        return Err(format!("'@{}' 継承が循環しています", name))
+    }
+    name_history.insert(name.clone());
+    
+    let e = r.extend.clone().unwrap();
+
+    // 継承先がまだ継承を適用されていなければ継承をする
+    if !extended_names.contains(&e) {
+        attach_ex_recursion(
+            rules_list, extended_names, name_history, e.clone())?;
+    }
+
+    let ex_list = match rules_list.get(&e) {
+        Some(r) => r.list.clone(),
+        None => return Err(format!("'{}'というルールは存在しません", name))
+    };
+
+    // rはすでにattach_ex_recursionでmutable borrowしているので、再取得する
+    let r = match rules_list.get_mut(&name) {
+        Some(r) => r,
+        None => return Err(format!("'{}'というルールは存在しません", name))
+    };
+
+    // リストを結合する
+    for r_ex in ex_list {
+        r.list.push(r_ex);
+    }
+
+    // 結合したルールを追加する
+    extended_names.insert(name.to_string());
+    Ok(())
+}
+
+/// 継承を適用する
+fn attach_ex(rules_list: &mut HashMap<String, Rules>) -> Result<(), String> {
+    // 継承済みのルール名を入れておく
+    let mut extended_names = HashSet::new();
+    let name_list: Vec<String> = rules_list.iter().map(|(n, _)| n.clone()).collect();
+
+    // rules_listの継承を適用する
+    for name in name_list {
+        // 循環しないように継承元の名前を持っておく
+        let mut name_history = HashSet::new();
+
+        attach_ex_recursion(rules_list, 
+                            &mut extended_names, 
+                            &mut name_history, 
+                            name.to_string())?;
+    }
+
+    Ok(())
 }
 
 impl Rules {
@@ -201,6 +274,7 @@ impl Rules {
     pub fn new<R: Read>(mut r: R) -> Result<HashMap<String, Rules>, String> {
         let mut s = String::new();
         let mut list = Vec::new();
+        let mut extend = None;
         let mut rule_name = String::new();
         let mut rules_list = HashMap::new();
 
@@ -219,14 +293,32 @@ impl Rules {
                 // '@'が来たらルールを作成して、rules_listに追加する
                 '@' => match l.get(1..) {
                     Some(n) => {
-                        let r = Rules::from_vec(&rule_name, list.clone());
+                        let r = Rules::from_vec(
+                            &rule_name, extend, list.clone());
 
                         rules_list.insert(rule_name, r);
 
                         // listの要素を初期化
                         list.clear();
+
                         // rule_nameを新しいものにする
-                        rule_name = n.to_string();
+                        rule_name = 
+                            n.split(':').next().unwrap().trim().to_string();
+
+                        // extendを新しいものにする
+                        if let Some(ex) = n.split(':').nth(1) {
+                            match ex.trim().get(1..) {
+                                Some(ex) => {
+                                    extend = Some(ex.to_string());
+                                }
+                                // Noneのときはルール名は空文字列
+                                None => {
+                                    extend = Some(String::new());
+                                }
+                            }
+                        } else {
+                            extend = None;
+                        }
                     },
                     None => return Err(format!("ルール名がありません"))
                 },
@@ -238,15 +330,22 @@ impl Rules {
         }
 
         // 最後にrules_listに追加する
-        let r = Rules::from_vec(&rule_name, list.clone());
+        let r = Rules::from_vec(&rule_name, extend, list.clone());
         rules_list.insert(rule_name, r);
+
+        // 継承を適用する
+        attach_ex(&mut rules_list)?;
 
         Ok(rules_list)
     }
 
-    pub fn from_vec(name: &str, v: Vec<KeyRule>) -> Rules {
+    pub fn from_vec(name: &str, 
+                    extend: Option<String>, 
+                    v: Vec<KeyRule>) -> Rules 
+        {
         Rules {
             name: name.to_string(),
+            extend,
             list: v
         }
     }
@@ -413,7 +512,7 @@ mod test {
         B -> 'A
         "#.as_bytes()).unwrap();
         let mut rlist = HashMap::new();
-        rlist.insert("".to_string(), Rules { name: String::new(), list: vec![
+        rlist.insert("".to_string(), Rules { name: String::new(), extend: None, list: vec![
             KeyRule::new(vec![Key::Raw(code.from_keyword("A").unwrap())], vec![Key::Con(code.from_keyword("B").unwrap())]),
             KeyRule::new(vec![Key::Raw(code.from_keyword("B").unwrap())], vec![Key::Con(code.from_keyword("A").unwrap())]),
         ]});
@@ -431,19 +530,67 @@ mod test {
             ENTER -> @RULE1
         "#.as_bytes()).unwrap();
         let mut rlist = HashMap::new();
-        rlist.insert("".to_string(), Rules { name: String::new(), list: vec![
+        rlist.insert("".to_string(), Rules { name: String::new(), extend: None, list: vec![
             KeyRule::new(vec![Key::Raw(code.from_keyword("A").unwrap())], vec![Key::Con(code.from_keyword("B").unwrap())]),
             KeyRule::new(vec![Key::Raw(code.from_keyword("B").unwrap())], vec![Key::Con(code.from_keyword("A").unwrap())]),
         ]});
-        rlist.insert("RULE1".to_string(), Rules { name: "RULE1".to_string(), list: vec![
+        rlist.insert("RULE1".to_string(), Rules { name: "RULE1".to_string(), extend: None, list: vec![
             KeyRule::new(vec![Key::Raw(code.from_keyword("M").unwrap())], vec![Key::Con(code.from_keyword("N").unwrap())]),
             KeyRule::new(vec![Key::Raw(code.from_keyword("N").unwrap())], vec![Key::Con(code.from_keyword("M").unwrap())]),
         ]});
-        rlist.insert("RULE2".to_string(), Rules { name: "RULE2".to_string(), list: vec![
+        rlist.insert("RULE2".to_string(), Rules { name: "RULE2".to_string(), extend: None, list: vec![
             KeyRule::new(vec![Key::Raw(code.from_keyword("X").unwrap()), Key::Raw(code.from_keyword("Y").unwrap())], vec![Key::Con(code.from_keyword("Z").unwrap())]),
             KeyRule::new(vec![Key::Raw(code.from_keyword("ENTER").unwrap())], vec![Key::Rule("RULE1".to_string())]),
         ]});
         assert_eq!(r, rlist);
+
+        /* 継承のテスト */
+        let r = Rules::new(r#"
+        @RULE1
+        @RULE2 : @RULE1
+        @RULE3 : @
+        "#.as_bytes()).unwrap();
+        let mut rlist = HashMap::new();
+        rlist.insert("".to_string(), Rules { name: String::new(), extend: None, list: vec![]});
+        rlist.insert("RULE1".to_string(), Rules { name: "RULE1".to_string(), extend: None, list: vec![]});
+        rlist.insert("RULE2".to_string(), Rules { name: "RULE2".to_string(), extend: Some("RULE1".to_string()), list: vec![]});
+        rlist.insert("RULE3".to_string(), Rules { name: "RULE3".to_string(), extend: Some("".to_string()), list: vec![]});
+        assert_eq!(r, rlist);
+
+        let r = Rules::new(r#"
+        @RULE1
+            A -> 'B
+            B -> 'A
+        @RULE2 : @RULE1
+            M -> 'N
+            N -> 'M
+        "#.as_bytes()).unwrap();
+        let mut rlist = HashMap::new();
+        rlist.insert("".to_string(), Rules { name: String::new(), extend: None, list: vec![]});
+        rlist.insert("RULE1".to_string(), Rules { name: "RULE1".to_string(), extend: None, list: vec![
+            KeyRule::new(vec![Key::Raw(code.from_keyword("A").unwrap())], vec![Key::Con(code.from_keyword("B").unwrap())]),
+            KeyRule::new(vec![Key::Raw(code.from_keyword("B").unwrap())], vec![Key::Con(code.from_keyword("A").unwrap())]),
+        ]});
+        rlist.insert("RULE2".to_string(), Rules { name: "RULE2".to_string(), extend: Some("RULE1".to_string()), list: vec![
+            KeyRule::new(vec![Key::Raw(code.from_keyword("M").unwrap())], vec![Key::Con(code.from_keyword("N").unwrap())]),
+            KeyRule::new(vec![Key::Raw(code.from_keyword("N").unwrap())], vec![Key::Con(code.from_keyword("M").unwrap())]),
+            KeyRule::new(vec![Key::Raw(code.from_keyword("A").unwrap())], vec![Key::Con(code.from_keyword("B").unwrap())]),
+            KeyRule::new(vec![Key::Raw(code.from_keyword("B").unwrap())], vec![Key::Con(code.from_keyword("A").unwrap())]),
+        ]});
+        assert_eq!(r, rlist);
+
+        let r = r#"
+        @RULE1 : @RULE2
+        @RULE2 : @RULE3
+        @RULE3 : @RULE1
+        "#.as_bytes();
+        // RULE1, RULE2, RULE3のいずれか
+        match Rules::new(r) {
+            Err(e) if &e == "'@RULE1' 継承が循環しています" => (),
+            Err(e) if &e == "'@RULE2' 継承が循環しています" => (),
+            Err(e) if &e == "'@RULE3' 継承が循環しています" => (),
+            _ => panic!()
+        }
     }
 
     #[test]
