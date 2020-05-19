@@ -103,13 +103,23 @@ mod test_key {
 pub struct KeyRule {
     pub k: Vec<Key>,
     pub v: Vec<Key>,
+    pub ove: bool
 }
 
 impl KeyRule {
     pub fn new(k: Vec<Key>, v: Vec<Key>) -> KeyRule {
         KeyRule {
             k: k,
-            v: v
+            v: v,
+            ove: false
+        }
+    }
+
+    pub fn with_ove(k: Vec<Key>, v: Vec<Key>, ove: bool) -> KeyRule {
+        KeyRule {
+            k: k,
+            v: v,
+            ove
         }
     }
 
@@ -123,11 +133,22 @@ impl KeyRule {
     }
 
     // 文字列からKeyRuleを作成する
-    pub fn from_str(s: &str) -> Result<KeyRule, String> {
+    // boolは上書きするかどうか
+    pub fn from_str(string: &str) -> Result<KeyRule, String> {
         let mut klist = Vec::new();
         let mut vlist = Vec::new();
+        let mut s;
+        let mut ove = false;
 
-        let mut s = s.split("->");
+        if string.contains("->") {
+            s = string.split("->");
+        } else if string.contains("-!>") {
+            s = string.split("-!>");
+            ove = true;
+        } else {
+            return Err(format!("'->' or '-!>' がありません"))
+        }
+
         let kstr = match s.next() {
             Some(kstr) => kstr,
             None => return Err(format!("左側の値がありません"))
@@ -161,7 +182,8 @@ impl KeyRule {
 
         Ok(KeyRule {
             k: klist,
-            v: vlist
+            v: vlist,
+            ove
         })
     }
 

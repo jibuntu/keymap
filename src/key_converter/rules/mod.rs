@@ -223,9 +223,19 @@ impl RulesParser {
                 Err(e) => return Err(format!("'@{}' {}", key, e))
             };
 
-            for (i, r) in rules {
-                // すでに同じルールのキーが同じルールがあればエラーを出す
-                if list.iter().all(|rule| !rule.compare_k(&r.k)) == false {
+            'outer: for (i, r) in rules {
+                for rule in &mut list {
+                    if !rule.compare_k(&r.k) {
+                        continue
+                    }
+
+                    // オーバーライドがtrueだったら、ルールの値を書き換える
+                    if r.ove {
+                        *rule = r.clone();
+                        continue 'outer
+                    }
+
+                    // そうでなければエラーを返す
                     return Err(format!("同じキーでルールを登録することはできません: line {}", i))
                 }
 
@@ -262,13 +272,15 @@ impl RulesParser {
             None => return Ok(rules)
         };
 
-        rules.append(&mut parsed_rules.rule_list.clone());
-
+        // 継承先があればそれを先に追加する
         if let Some(e) = &parsed_rules.extend {
             let mut r = RulesParser::get_rule_rec(
                 &e, name_history, parsed_rules_list)?;
             rules.append(&mut r);
         }
+
+        // 継承先のルールを追加したあとに自身を追加する
+        rules.append(&mut parsed_rules.rule_list.clone());
 
         Ok(rules)
     }
@@ -343,6 +355,22 @@ mod test {
         "#.as_bytes();
         assert_eq!(RulesParser::parse(r), Err("同じキーでルールを登録することはできません: line 4".to_string()));
 
+
+        let r = RulesParser::parse(r#"
+        A -> 'B
+        @test : @
+          A -!> 'A
+          A -!> 'C
+        "#.as_bytes()).unwrap();
+        let mut rlist = HashMap::new();
+        rlist.insert("".to_string(), Rules { name: String::new(), extend: None, list: vec![
+            KeyRule::new(vec![Key::Raw(code.from_keyword("A").unwrap())], vec![Key::Con(code.from_keyword("B").unwrap())]),
+        ]});
+        rlist.insert("test".to_string(), Rules { name: "test".to_string(), extend: Some("".to_string()), list: vec![
+            KeyRule::with_ove(vec![Key::Raw(code.from_keyword("A").unwrap())], vec![Key::Con(code.from_keyword("C").unwrap())], true),
+        ]});
+        assert_eq!(r, rlist);
+
         let r = RulesParser::parse(r#"
         A -> 'B
         B -> 'A
@@ -397,10 +425,10 @@ mod test {
             KeyRule::new(vec![Key::Raw(code.from_keyword("B").unwrap())], vec![Key::Con(code.from_keyword("A").unwrap())]),
         ]});
         rlist.insert("RULE2".to_string(), Rules { name: "RULE2".to_string(), extend: Some("RULE1".to_string()), list: vec![
-            KeyRule::new(vec![Key::Raw(code.from_keyword("M").unwrap())], vec![Key::Con(code.from_keyword("N").unwrap())]),
-            KeyRule::new(vec![Key::Raw(code.from_keyword("N").unwrap())], vec![Key::Con(code.from_keyword("M").unwrap())]),
             KeyRule::new(vec![Key::Raw(code.from_keyword("A").unwrap())], vec![Key::Con(code.from_keyword("B").unwrap())]),
             KeyRule::new(vec![Key::Raw(code.from_keyword("B").unwrap())], vec![Key::Con(code.from_keyword("A").unwrap())]),
+            KeyRule::new(vec![Key::Raw(code.from_keyword("M").unwrap())], vec![Key::Con(code.from_keyword("N").unwrap())]),
+            KeyRule::new(vec![Key::Raw(code.from_keyword("N").unwrap())], vec![Key::Con(code.from_keyword("M").unwrap())]),
         ]});
         assert_eq!(r, rlist);
 
