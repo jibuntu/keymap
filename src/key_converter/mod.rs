@@ -7,6 +7,7 @@ use std::io::Read;
 
 mod rules;
 use self::rules::Rules;
+use self::rules::RulesParser;
 use self::rules::key_rule::Key;
 
 
@@ -20,10 +21,7 @@ pub struct KeyConverter {
 
 impl KeyConverter {
     pub fn new<R: Read>(r: R) -> Result<KeyConverter, String> {
-        let rules_list = match Rules::new(r) {
-            Ok(rules) => rules,
-            Err(e) => return Err(e)
-        };
+        let rules_list = RulesParser::parse(r)?;
 
         let mut rules_list: HashMap<String, Box<Rules>> = 
              rules_list.into_iter().map(|(s, r)| (s, Box::new(r))).collect();

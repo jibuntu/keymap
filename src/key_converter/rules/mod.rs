@@ -10,13 +10,7 @@ use std::io::Read;
 pub mod key_rule;
 use self::key_rule::KeyRule;
 use self::key_rule::Key;
-use self::key_rule::keycode::Keycode;
 
-
-lazy_static! {
-    // 毎回作成するのは非効率なのでstaticにしておく
-    static ref KEYCODE: Keycode = Keycode::new();
-}
 
 /// ルールの構造体
 #[derive(Debug, Clone, PartialEq)]
@@ -26,150 +20,7 @@ pub struct Rules {
     list: Vec<KeyRule>,
 }
 
-/// 再帰的に継承をする
-/// 引数のnameのルールの継承を適用する
-fn attach_ex_recursion(rules_list: &mut HashMap<String, Rules>, 
-                       extended_names: &mut HashSet<String>, 
-                       name_history: &mut HashSet<String>,
-                       name: String) -> Result<(), String>
-{
-    let r = match rules_list.get(&name) {
-        Some(r) => r,
-        None => return Err(format!("'{}'というルールは存在しません", name))
-    };
-
-    // 継承先がなければ何もしない
-    if let None = r.extend {
-        return Ok(())
-    }
-
-    // 継承が循環していたらエラーを返す
-    if name_history.contains(&name) {
-        return Err(format!("'@{}' 継承が循環しています", name))
-    }
-    name_history.insert(name.clone());
-    
-    let e = r.extend.clone().unwrap();
-
-    // 継承先がまだ継承を適用されていなければ継承をする
-    if !extended_names.contains(&e) {
-        attach_ex_recursion(
-            rules_list, extended_names, name_history, e.clone())?;
-    }
-
-    let ex_list = match rules_list.get(&e) {
-        Some(r) => r.list.clone(),
-        None => return Err(format!("'{}'というルールは存在しません", name))
-    };
-
-    // rはすでにattach_ex_recursionでmutable borrowしているので、再取得する
-    let r = match rules_list.get_mut(&name) {
-        Some(r) => r,
-        None => return Err(format!("'{}'というルールは存在しません", name))
-    };
-
-    // リストを結合する
-    for r_ex in ex_list {
-        r.list.push(r_ex);
-    }
-
-    // 結合したルールを追加する
-    extended_names.insert(name.to_string());
-    Ok(())
-}
-
-/// 継承を適用する
-fn attach_ex(rules_list: &mut HashMap<String, Rules>) -> Result<(), String> {
-    // 継承済みのルール名を入れておく
-    let mut extended_names = HashSet::new();
-    let name_list: Vec<String> = rules_list.iter().map(|(n, _)| n.clone()).collect();
-
-    // rules_listの継承を適用する
-    for name in name_list {
-        // 循環しないように継承元の名前を持っておく
-        let mut name_history = HashSet::new();
-
-        attach_ex_recursion(rules_list, 
-                            &mut extended_names, 
-                            &mut name_history, 
-                            name.to_string())?;
-    }
-
-    Ok(())
-}
-
 impl Rules {
-    /// ストリームからRulesを作る
-    pub fn new<R: Read>(mut r: R) -> Result<HashMap<String, Rules>, String> {
-        let mut s = String::new();
-        let mut list = Vec::new();
-        let mut extend = None;
-        let mut rule_name = String::new();
-        let mut rules_list = HashMap::new();
-
-        let _ = r.read_to_string(&mut s);
-
-        // コメントを削除して、不要な行を削除する
-        let lines = s.lines()
-            .map(|l| l.split('#').next().unwrap())
-            .map(|l| l.trim())
-            .enumerate()
-            .filter(|(_, l)| l.len() != 0);
-
-        //for (i, l) in lines {
-        for (i, l) in lines {
-            match l.chars().next().unwrap() {
-                // '@'が来たらルールを作成して、rules_listに追加する
-                '@' => match l.get(1..) {
-                    Some(n) => {
-                        let r = Rules::from_vec(
-                            &rule_name, extend, list.clone());
-
-                        rules_list.insert(rule_name, r);
-
-                        // listの要素を初期化
-                        list.clear();
-
-                        // rule_nameを新しいものにする
-                        rule_name = 
-                            n.split(':').next().unwrap().trim().to_string();
-
-                        // extendを新しいものにする
-                        if let Some(ex) = n.split(':').nth(1) {
-                            match ex.trim().get(1..) {
-                                Some(ex) => {
-                                    extend = Some(ex.to_string());
-                                }
-                                // Noneのときはルール名は空文字列
-                                None => {
-                                    extend = Some(String::new());
-                                }
-                            }
-                        } else {
-                            extend = None;
-                        }
-                    },
-                    None => return Err(format!("ルール名がありません"))
-                },
-                _ => match KeyRule::from_str(l) {
-                    Ok(k) => {
-                        list.push(k);
-                    },
-                    Err(e) => return Err(format!("{}: line {}", e, i+1))
-                }
-            }
-        }
-
-        // 最後にrules_listに追加する
-        let r = Rules::from_vec(&rule_name, extend, list.clone());
-        rules_list.insert(rule_name, r);
-
-        // 継承を適用する
-        attach_ex(&mut rules_list)?;
-
-        Ok(rules_list)
-    }
-
     pub fn from_vec(name: &str, 
                     extend: Option<String>, 
                     v: Vec<KeyRule>) -> Rules 
@@ -431,7 +282,7 @@ mod test {
     use super::Key;
     use super::KeyRule;
     use super::Rules;
-    use super::Keycode;
+    use super::key_rule::keycode::Keycode;
     use super::RulesParser;
 
     macro_rules! hash {
@@ -559,122 +410,7 @@ mod test {
         @RULE3 : @RULE1
         "#.as_bytes();
         // RULE1, RULE2, RULE3のいずれか
-        match Rules::new(r) {
-            Err(e) if &e == "'@RULE1' 継承が循環しています" => (),
-            Err(e) if &e == "'@RULE2' 継承が循環しています" => (),
-            Err(e) if &e == "'@RULE3' 継承が循環しています" => (),
-            _ => panic!()
-        }
-    }
-
-    #[test]
-    fn test_rule_new() {
-        let code = Keycode::new();
-
-        let r = Rules::new("".as_bytes()).unwrap().remove("").unwrap();
-        assert_eq!(r.list, vec![]);
-
-        if let Ok(_) = Rules::new("->".as_bytes()) { panic!() }
-        if let Ok(_) = Rules::new("a->".as_bytes()) { panic!() } 
-        if let Ok(_) = Rules::new("->mm".as_bytes()) { panic!() } 
-
-        let r = Rules::new("A -> B".as_bytes()).unwrap().remove("").unwrap();
-        assert_eq!(r.list, vec![
-            KeyRule::new(vec![Key::Raw(code.from_keyword("A").unwrap())], vec![Key::Raw(code.from_keyword("B").unwrap())])
-        ]);
-
-        let mut r = Rules::new(r#"
-        # test
-        A -> 'B
-        B -> 'A # test
-        # aiueo
-        C -> 'ENTER
-        "#.as_bytes()).unwrap();
-        assert_eq!(r.remove("").unwrap().list, vec![
-            KeyRule::new(vec![Key::Raw(code.from_keyword("A").unwrap())], vec![Key::Con(code.from_keyword("B").unwrap())]),
-            KeyRule::new(vec![Key::Raw(code.from_keyword("B").unwrap())], vec![Key::Con(code.from_keyword("A").unwrap())]),
-            KeyRule::new(vec![Key::Raw(code.from_keyword("C").unwrap())], vec![Key::Con(code.from_keyword("ENTER").unwrap())]),
-        ]);
-
-        let r = Rules::new(r#"
-        A -> 'B
-        B -> 'A
-        "#.as_bytes()).unwrap();
-        let mut rlist = HashMap::new();
-        rlist.insert("".to_string(), Rules { name: String::new(), extend: None, list: vec![
-            KeyRule::new(vec![Key::Raw(code.from_keyword("A").unwrap())], vec![Key::Con(code.from_keyword("B").unwrap())]),
-            KeyRule::new(vec![Key::Raw(code.from_keyword("B").unwrap())], vec![Key::Con(code.from_keyword("A").unwrap())]),
-        ]});
-        assert_eq!(r, rlist);
-
-        let r = Rules::new(r#"
-        A -> 'B
-        B -> 'A
-        @RULE1
-            M -> 'N
-            N -> 'M
-        
-        @RULE2
-            X + Y -> 'Z
-            ENTER -> @RULE1
-        "#.as_bytes()).unwrap();
-        let mut rlist = HashMap::new();
-        rlist.insert("".to_string(), Rules { name: String::new(), extend: None, list: vec![
-            KeyRule::new(vec![Key::Raw(code.from_keyword("A").unwrap())], vec![Key::Con(code.from_keyword("B").unwrap())]),
-            KeyRule::new(vec![Key::Raw(code.from_keyword("B").unwrap())], vec![Key::Con(code.from_keyword("A").unwrap())]),
-        ]});
-        rlist.insert("RULE1".to_string(), Rules { name: "RULE1".to_string(), extend: None, list: vec![
-            KeyRule::new(vec![Key::Raw(code.from_keyword("M").unwrap())], vec![Key::Con(code.from_keyword("N").unwrap())]),
-            KeyRule::new(vec![Key::Raw(code.from_keyword("N").unwrap())], vec![Key::Con(code.from_keyword("M").unwrap())]),
-        ]});
-        rlist.insert("RULE2".to_string(), Rules { name: "RULE2".to_string(), extend: None, list: vec![
-            KeyRule::new(vec![Key::Raw(code.from_keyword("X").unwrap()), Key::Raw(code.from_keyword("Y").unwrap())], vec![Key::Con(code.from_keyword("Z").unwrap())]),
-            KeyRule::new(vec![Key::Raw(code.from_keyword("ENTER").unwrap())], vec![Key::Rule("RULE1".to_string())]),
-        ]});
-        assert_eq!(r, rlist);
-
-        /* 継承のテスト */
-        let r = Rules::new(r#"
-        @RULE1
-        @RULE2 : @RULE1
-        @RULE3 : @
-        "#.as_bytes()).unwrap();
-        let mut rlist = HashMap::new();
-        rlist.insert("".to_string(), Rules { name: String::new(), extend: None, list: vec![]});
-        rlist.insert("RULE1".to_string(), Rules { name: "RULE1".to_string(), extend: None, list: vec![]});
-        rlist.insert("RULE2".to_string(), Rules { name: "RULE2".to_string(), extend: Some("RULE1".to_string()), list: vec![]});
-        rlist.insert("RULE3".to_string(), Rules { name: "RULE3".to_string(), extend: Some("".to_string()), list: vec![]});
-        assert_eq!(r, rlist);
-
-        let r = Rules::new(r#"
-        @RULE1
-            A -> 'B
-            B -> 'A
-        @RULE2 : @RULE1
-            M -> 'N
-            N -> 'M
-        "#.as_bytes()).unwrap();
-        let mut rlist = HashMap::new();
-        rlist.insert("".to_string(), Rules { name: String::new(), extend: None, list: vec![]});
-        rlist.insert("RULE1".to_string(), Rules { name: "RULE1".to_string(), extend: None, list: vec![
-            KeyRule::new(vec![Key::Raw(code.from_keyword("A").unwrap())], vec![Key::Con(code.from_keyword("B").unwrap())]),
-            KeyRule::new(vec![Key::Raw(code.from_keyword("B").unwrap())], vec![Key::Con(code.from_keyword("A").unwrap())]),
-        ]});
-        rlist.insert("RULE2".to_string(), Rules { name: "RULE2".to_string(), extend: Some("RULE1".to_string()), list: vec![
-            KeyRule::new(vec![Key::Raw(code.from_keyword("M").unwrap())], vec![Key::Con(code.from_keyword("N").unwrap())]),
-            KeyRule::new(vec![Key::Raw(code.from_keyword("N").unwrap())], vec![Key::Con(code.from_keyword("M").unwrap())]),
-            KeyRule::new(vec![Key::Raw(code.from_keyword("A").unwrap())], vec![Key::Con(code.from_keyword("B").unwrap())]),
-            KeyRule::new(vec![Key::Raw(code.from_keyword("B").unwrap())], vec![Key::Con(code.from_keyword("A").unwrap())]),
-        ]});
-        assert_eq!(r, rlist);
-
-        let r = r#"
-        @RULE1 : @RULE2
-        @RULE2 : @RULE3
-        @RULE3 : @RULE1
-        "#.as_bytes();
-        // RULE1, RULE2, RULE3のいずれか
-        match Rules::new(r) {
+        match RulesParser::parse(r) {
             Err(e) if &e == "'@RULE1' 継承が循環しています" => (),
             Err(e) if &e == "'@RULE2' 継承が循環しています" => (),
             Err(e) if &e == "'@RULE3' 継承が循環しています" => (),
@@ -710,23 +446,23 @@ mod test {
         let KEY_UP: u16 = code.from_keyword("UP").unwrap();
         let KEY_DOWN: u16 = code.from_keyword("DOWN").unwrap();
 
-        let rule = Rules::new("".as_bytes()).unwrap().remove("").unwrap();
+        let rule = RulesParser::parse("".as_bytes()).unwrap().remove("").unwrap();
         assert_eq!(rule.filter(&hash![Key::Raw(KEY_A)]), vec![Key::Raw(KEY_A)]);
 
 
-        let mut rule = Rules::new("".as_bytes()).unwrap().remove("").unwrap();
+        let mut rule = RulesParser::parse("".as_bytes()).unwrap().remove("").unwrap();
         // A -> 'H
         rule.list.push(KeyRule::new(vec![Key::Raw(KEY_A)], vec![Key::Con(KEY_H)]));
         assert_eq!(rule.filter(&hash![Key::Raw(KEY_A)]), vec![Key::Con(KEY_H)]);
 
-        let mut rule = Rules::new("".as_bytes()).unwrap().remove("").unwrap();
+        let mut rule = RulesParser::parse("".as_bytes()).unwrap().remove("").unwrap();
         // A -> 'H
         rule.list.push(KeyRule::new(vec![Key::Raw(KEY_A)], vec![Key::Con(KEY_H)]));
         // 'H -> 'A
         rule.list.push(KeyRule::new(vec![Key::Con(KEY_H)], vec![Key::Con(KEY_A)]));
         assert_eq!(rule.filter(&hash![Key::Raw(KEY_A)]), vec![Key::Con(KEY_A)]);
 
-        let mut rule = Rules::new("".as_bytes()).unwrap().remove("").unwrap();
+        let mut rule = RulesParser::parse("".as_bytes()).unwrap().remove("").unwrap();
         // B -> 'I 
         rule.list.push(KeyRule::new(vec![Key::Raw(KEY_B)], vec![Key::Con(KEY_I)]));
         // I -> 'B 
@@ -749,7 +485,7 @@ mod test {
         // push I + A + B
         assert_eq!(rule.filter(&hash![Key::Raw(KEY_I), Key::Raw(KEY_A), Key::Raw(KEY_B)]), vec![Key::Con(KEY_I), Key::Con(KEY_ENTER)]);
 
-        let mut rule = Rules::new("".as_bytes()).unwrap().remove("").unwrap();
+        let mut rule = RulesParser::parse("".as_bytes()).unwrap().remove("").unwrap();
         // B -> 'I 
         rule.list.push(KeyRule::new(vec![Key::Raw(KEY_B)], vec![Key::Con(KEY_I)]));
         // ALT -> 'CTRL 
