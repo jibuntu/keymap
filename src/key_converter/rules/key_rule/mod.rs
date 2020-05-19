@@ -113,6 +113,15 @@ impl KeyRule {
         }
     }
 
+    /// self.kの値が引数と同じかどうかを比較する
+    pub fn compare_k(&self, k: &Vec<Key>) -> bool {
+        if self.k.len() != k.len() {
+            return false
+        }
+
+        self.k.iter().zip(k.iter()).all(|(a, b)| a == b)
+    }
+
     // 文字列からKeyRuleを作成する
     pub fn from_str(s: &str) -> Result<KeyRule, String> {
         let mut klist = Vec::new();
