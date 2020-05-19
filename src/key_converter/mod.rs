@@ -7,7 +7,7 @@ use std::io::Read;
 
 mod rules;
 use self::rules::Rules;
-use self::rules::Key;
+use self::rules::key_rule::Key;
 
 
 pub struct KeyConverter {
